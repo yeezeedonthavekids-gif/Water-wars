@@ -1,0 +1,10 @@
+node_modules
+dist
+.netlify
+*.log
+.env
+.env.*
+!.env.example
+firebase-debug.log*
+database-debug.log*
+test-results

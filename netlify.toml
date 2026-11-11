@@ -1,0 +1,25 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  # firebase-admin uses dynamic requires; ship it as a normal node module.
+  external_node_modules = ["firebase-admin"]
+
+# The game API is a single function mounted at /api/* (see netlify/functions/api.mts).
+
+# SPA routing: every other path serves the app shell.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
