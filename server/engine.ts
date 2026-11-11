@@ -25,14 +25,13 @@ export const QUESTION_MS = 45_000;
 export const TRADE_MS = 30_000;
 export const OFFLINE_GRACE_MS = 20_000;
 export const FREE_ACTION_EXTEND_MS = 30_000;
-export const CLASSIC_HAND = 7;
+export const CLASSIC_HAND = 5;
 export const BATTLE_HAND = 5;
-export const CLASSIC_ROUNDS = 10;
+export const CLASSIC_ROUNDS = 20;
 export const BATTLE_ROUNDS = 20;
 export const DROUGHT_ROUND = 10;
 export const BATTLE_HAND_LIMIT = 8;
 export const SHIELD_CAP = 8;
-export const GO_OUT_BONUS = 10;
 export const SET_BONUS_CORRECT = 6;
 export const SET_BONUS_WRONG = 2;
 const LOG_LIMIT = 40;
@@ -132,6 +131,8 @@ export interface GameState {
   usedQuestions: string[];
   results: ResultRow[] | null;
   winnerIds: string[];
+  /** Set while resolving a question that grants the asker another turn. */
+  extraTurn?: boolean;
 }
 
 // ───────────────────────── Helpers ─────────────────────────
@@ -575,8 +576,7 @@ function checkGameEnd(s: GameState, ctx: Ctx): boolean {
     }
     const out = active.find((p) => hand(s, p.id).length === 0);
     if (out) {
-      out.score += GO_OUT_BONUS;
-      log(s, ctx, `🏁 ${out.name} played their last card! +${GO_OUT_BONUS} bonus.`, 'good', out.id);
+      log(s, ctx, `🏁 ${out.name} played their last card!`, 'good', out.id);
       finishGame(s, ctx, `${out.name} went out.`, out.id);
       return true;
     }
@@ -592,14 +592,14 @@ function finishGame(s: GameState, ctx: Ctx, reason: string, wentOutId?: string) 
     const handSize = hand(s, p.id).length;
     let sortKey: number[];
     if (s.mode === 'classic') {
-      sortKey = [p.status === 'left' ? 1 : 0, -p.score, handSize];
+      sortKey = [p.status === 'left' ? 1 : 0, handSize];
     } else {
       const alive = p.status === 'active' ? 0 : p.status === 'out' ? 1 : 2;
       sortKey = [alive, alive === 0 ? -p.hp : alive === 1 ? p.placement ?? 99 : 0, -p.score];
     }
     return {
       id: p.id, name: p.name, avatar: p.avatar, rank: 0, score: p.score, hp: Math.max(0, p.hp), sets: p.sets,
-      status: p.status, stats: { ...p.stats }, wentOut: p.id === wentOutId, sortKey,
+      status: p.status, stats: { ...p.stats }, wentOut: p.id === wentOutId, cardsLeft: handSize, sortKey,
     };
   });
   rows.sort((a, b) => {
@@ -646,7 +646,9 @@ function resolveQuestion(s: GameState, ctx: Ctx, choice: number) {
     // If the turn player left meanwhile, move on.
     if (currentPlayer(s)?.status !== 'active') advanceTurn(s, ctx, 1);
   } else {
-    finishTurn(s, ctx);
+    const again = !!s.extraTurn;
+    delete s.extraTurn;
+    finishTurn(s, ctx, again ? 0 : 1);
   }
 }
 
@@ -658,15 +660,10 @@ function applyPurpose(s: GameState, ctx: Ctx, q: PendingQuestion, correct: boole
     case 'challenge': {
       const def = defOf(pu.cardId);
       const target = getPlayer(s, pu.targetId);
-      const challenger = getPlayer(s, pu.challengerId);
       if (classic) {
-        if (correct) {
-          if (target) target.score += def.points;
-          return `${target?.name} scores ${def.points}.`;
-        }
-        if (challenger) challenger.score += def.points;
-        if (target && target.status === 'active') drawCards(s, ctx, target.id, 1);
-        return `${challenger?.name} scores ${def.points} and ${target?.name} draws 1.`;
+        if (correct) return `${target?.name} knew it! No penalty.`;
+        if (target && target.status === 'active') drawCards(s, ctx, target.id, 2);
+        return `${target?.name} draws 2 cards.`;
       }
       if (correct) {
         if (target) heal(target, 1);
@@ -686,12 +683,10 @@ function applyPurpose(s: GameState, ctx: Ctx, q: PendingQuestion, correct: boole
       const rw = REALWORLD[defOf(pu.cardId).id];
       if (classic) {
         s.activeProperty = pu.property && rw.props.includes(pu.property) ? pu.property : rw.props[0];
-        const color = `Active property is now ${PROPERTY_LABEL[s.activeProperty]}.`;
-        if (correct && asker) {
-          asker.score += 3;
-          return `+3 points. ${color}`;
-        }
-        return color;
+        const color = `The color is now ${PROPERTY_LABEL[s.activeProperty]}.`;
+        if (correct || !asker) return color;
+        drawCards(s, ctx, asker.id, 1);
+        return `${asker.name} draws 1. ${color}`;
       }
       if (!correct) return 'The attack fizzled.';
       const dmg = dealDamage(s, ctx, q.askerId, pu.targetId!, attackPower(asker, 3));
@@ -708,11 +703,16 @@ function applyPurpose(s: GameState, ctx: Ctx, q: PendingQuestion, correct: boole
       return correct ? `Combo hits ${nameOf(s, pu.targetId)} for ${dmg}!` : `Weak combo: ${nameOf(s, pu.targetId)} takes ${dmg}.`;
     }
     case 'star': {
-      if (!correct || !asker) return 'No bonus this time.';
       if (classic) {
-        asker.score += 4;
-        return '+4 points.';
+        if (!asker) return '';
+        if (correct) {
+          s.extraTurn = true;
+          return `${asker.name} takes another turn!`;
+        }
+        drawCards(s, ctx, asker.id, 1);
+        return `${asker.name} draws 1 card.`;
       }
+      if (!correct || !asker) return 'No bonus this time.';
       heal(asker, 4);
       drawCards(s, ctx, asker.id, 1);
       return 'Heals 4 and draws 1.';
@@ -829,70 +829,8 @@ function classicAction(s: GameState, ctx: Ctx, me: PlayerState, a: GameAction) {
       return;
     }
     case 'endTurn': {
-      if (turn.stage !== 'afterDraw') fail('MUST_ACT', 'Play a card, draw, or ask before ending your turn.');
+      if (turn.stage !== 'afterDraw') fail('MUST_ACT', 'Play a card or draw before ending your turn.');
       return finishTurn(s, ctx);
-    }
-    case 'ask': {
-      if (turn.stage !== 'start') fail('BAD_STAGE', 'You can only ask at the start of your turn.');
-      const t = requireTarget(s, me.id, a.targetId);
-      if (!['cohesion', 'adhesion', 'surface'].includes(a.property)) fail('BAD_PROPERTY', 'Choose a property.');
-      if (hand(s, t.id).length < 2) fail('BAD_TARGET', `${t.name} has too few cards to ask.`);
-      const matches = hand(s, t.id).filter((c) => {
-        const d = defOf(c);
-        return !d.wild && d.properties.includes(a.property);
-      });
-      setLast(s, ctx, { type: 'ask', actorId: me.id, targetId: t.id });
-      if (matches.length) {
-        const c = pickRandom(matches, ctx.rng);
-        removeFromHand(s, t.id, c);
-        hand(s, me.id).push(c);
-        turn.stage = 'afterDraw';
-        log(s, ctx, `🎣 ${me.name} asked ${t.name} for ${PROPERTY_LABEL[a.property]} and got one!`, 'play', me.id);
-        return;
-      }
-      drawCards(s, ctx, me.id, 1);
-      log(s, ctx, `🎣 ${me.name} asked ${t.name} for ${PROPERTY_LABEL[a.property]}. Go Fish! (drew 1)`, 'play', me.id);
-      return finishTurn(s, ctx);
-    }
-    case 'set': {
-      if (turn.stage !== 'start') fail('BAD_STAGE', 'Bank sets at the start of your turn.');
-      if (turn.setDone) fail('SET_DONE', 'You can bank one set per turn.');
-      const ids = Array.isArray(a.cardIds) ? [...new Set(a.cardIds)] : [];
-      if (ids.length !== 3) fail('BAD_SET', 'A set is exactly 3 property cards.');
-      const defs = ids.map((id) => {
-        if (!hand(s, me.id).includes(id)) fail('NOT_IN_HAND', 'That card is not in your hand.');
-        return defOf(id);
-      });
-      if (!defs.every((d) => isPropertyCard(d) && d.category === defs[0].category)) {
-        fail('BAD_SET', 'A set needs 3 property cards of the same property.');
-      }
-      for (const id of ids) removeFromHand(s, me.id, id);
-      s.discard.unshift(...ids);
-      turn.setDone = true;
-      const property = defs[0].category as Property;
-      setLast(s, ctx, { type: 'set', actorId: me.id });
-      log(s, ctx, `🧪 ${me.name} is banking a ${PROPERTY_LABEL[property]} set. Science check!`, 'science', me.id);
-      askBankQuestion(s, ctx, property, undefined, {
-        responderId: me.id, askerId: me.id, title: `${PROPERTY_LABEL[property]} Set`, free: true,
-        stakes: `Correct: +${SET_BONUS_CORRECT} points. Wrong: +${SET_BONUS_WRONG}.`, purpose: { type: 'set', property },
-      });
-      return;
-    }
-    case 'trade': {
-      if (turn.stage !== 'start') fail('BAD_STAGE', 'Trade at the start of your turn.');
-      if (turn.tradeDone) fail('TRADE_DONE', 'You can offer one trade per turn.');
-      const t = requireTarget(s, me.id, a.targetId);
-      if (!hand(s, me.id).includes(a.giveCardId)) fail('NOT_IN_HAND', 'That card is not in your hand.');
-      if (!['cohesion', 'adhesion', 'surface'].includes(a.wantProperty)) fail('BAD_PROPERTY', 'Choose a property.');
-      if (hand(s, t.id).length < 1) fail('BAD_TARGET', `${t.name} has no cards.`);
-      turn.tradeDone = true;
-      s.seq += 1;
-      s.pending = {
-        kind: 'trade', id: `t${s.seq}`, fromId: me.id, toId: t.id, giveCardId: a.giveCardId,
-        wantProperty: a.wantProperty, deadline: ctx.now + TRADE_MS,
-      };
-      log(s, ctx, `🤝 ${me.name} offers ${t.name} a trade for a ${PROPERTY_LABEL[a.wantProperty]} card.`, 'play', me.id);
-      return;
     }
     case 'play':
       return classicPlay(s, ctx, me, a);
@@ -901,6 +839,7 @@ function classicAction(s: GameState, ctx: Ctx, me: PlayerState, a: GameAction) {
   }
 }
 
+/** Classic = UNO-style: match the active property, use action cards, first to empty their hand wins. */
 function classicPlay(s: GameState, ctx: Ctx, me: PlayerState, a: Extract<GameAction, { type: 'play' }>) {
   if (!hand(s, me.id).includes(a.cardId)) fail('NOT_IN_HAND', 'That card is not in your hand.');
   const def = defOf(a.cardId);
@@ -911,11 +850,10 @@ function classicPlay(s: GameState, ctx: Ctx, me: PlayerState, a: Extract<GameAct
   // Validate everything before mutating.
   let target: PlayerState | undefined;
   if (needsTarget(def, 'classic')) target = requireTarget(s, me.id, a.targetId);
-  if (def.effect === 'grab' && target && hand(s, target.id).length < 2) fail('BAD_TARGET', `${target.name} needs 2+ cards to grab from.`);
-  if (def.effect === 'swap') {
+  if (def.effect === 'swap' || def.effect === 'grab') {
     if (!a.giveCardId || a.giveCardId === a.cardId || !hand(s, me.id).includes(a.giveCardId)) fail('NEED_CARD', 'Choose a card to give away.');
-    if (target && hand(s, target.id).length < 1) fail('BAD_TARGET', `${target.name} has no cards.`);
   }
+  if (def.effect === 'swap' && target && hand(s, target.id).length < 1) fail('BAD_TARGET', `${target.name} has no cards.`);
   if (def.effect === 'wildBond' && !['cohesion', 'adhesion', 'surface'].includes(a.property as string)) fail('NEED_PROPERTY', 'Choose a property.');
   if (def.effect === 'waterPower' && !['draw', 'points', 'shield'].includes(a.choice as string)) fail('NEED_CHOICE', 'Choose a Water Power.');
 
@@ -924,13 +862,17 @@ function classicPlay(s: GameState, ctx: Ctx, me: PlayerState, a: Extract<GameAct
   me.stats.played += 1;
   setLast(s, ctx, { type: 'play', actorId: me.id, cardId: a.cardId, targetId: target?.id });
   const nextId = () => s.players[nextIdx(s, s.turn!.idx, 1)].id;
+  const nextDraws = (n: number, what: string) => {
+    const nid = nextId();
+    if (!classicShieldBlocks(s, ctx, nid, what)) {
+      drawCards(s, ctx, nid, n);
+      log(s, ctx, `${nameOf(s, nid)} draws ${n} card${n === 1 ? '' : 's'}.`, 'play', nid);
+    }
+  };
 
   if (isPropertyCard(def)) {
-    const pts = me.boost ? def.points * 2 : def.points;
-    if (me.boost) me.boost = false;
-    me.score += pts;
     s.activeProperty = def.category as Property;
-    log(s, ctx, `${me.name} played ${def.name} (+${pts}).`, 'play', me.id);
+    log(s, ctx, `${me.name} played ${def.name}.`, 'play', me.id);
     return finishTurn(s, ctx);
   }
 
@@ -942,7 +884,7 @@ function classicPlay(s: GameState, ctx: Ctx, me: PlayerState, a: Extract<GameAct
     askQuestion(s, ctx, {
       responderId: target!.id, askerId: me.id, title: def.name, prompt: q.prompt, options: q.options, answer: q.answer,
       explain: q.explain, cardId: a.cardId,
-      stakes: `Correct: ${target!.name} +${def.points}. Wrong: ${me.name} +${def.points} and ${target!.name} draws 1.`,
+      stakes: `Wrong answer: ${target!.name} draws 2 cards.`,
       purpose: { type: 'challenge', challengerId: me.id, targetId: target!.id, cardId: a.cardId },
     });
     return;
@@ -950,7 +892,6 @@ function classicPlay(s: GameState, ctx: Ctx, me: PlayerState, a: Extract<GameAct
 
   if (def.category === 'action') {
     s.activeProperty = def.properties[0];
-    me.score += def.points;
     let steps = 1;
     switch (def.effect) {
       case 'soap': {
@@ -968,22 +909,16 @@ function classicPlay(s: GameState, ctx: Ctx, me: PlayerState, a: Extract<GameAct
         if (activePlayers(s).length === 2) steps = 2;
         break;
       }
-      case 'capillary': {
-        const nid = nextId();
-        log(s, ctx, `🧪 ${me.name} played Capillary Pull on ${nameOf(s, nid)}.`, 'play', me.id);
-        if (!classicShieldBlocks(s, ctx, nid, 'Capillary Pull')) {
-          drawCards(s, ctx, nid, 2);
-          log(s, ctx, `${nameOf(s, nid)} draws 2 cards.`, 'play', nid);
-        }
+      case 'capillary':
+        log(s, ctx, `🧪 ${me.name} played Capillary Pull.`, 'play', me.id);
+        nextDraws(2, 'Capillary Pull');
         break;
-      }
       case 'grab': {
         log(s, ctx, `💧 ${me.name} played Droplet Grab on ${target!.name}.`, 'play', me.id);
         if (!classicShieldBlocks(s, ctx, target!.id, 'Droplet Grab')) {
-          const c = pickRandom(hand(s, target!.id), ctx.rng);
-          removeFromHand(s, target!.id, c);
-          hand(s, me.id).push(c);
-          log(s, ctx, `${me.name} took a card from ${target!.name}.`, 'play', me.id);
+          removeFromHand(s, me.id, a.giveCardId!);
+          hand(s, target!.id).push(a.giveCardId!);
+          log(s, ctx, `${me.name} pushed a card into ${target!.name}'s hand.`, 'play', me.id);
         }
         break;
       }
@@ -1010,47 +945,56 @@ function classicPlay(s: GameState, ctx: Ctx, me: PlayerState, a: Extract<GameAct
     askQuestion(s, ctx, {
       responderId: me.id, askerId: me.id, title: def.name,
       prompt: `${def.description} Which property explains this best?`, options: CLASSIFY_OPTIONS,
-      answer: rw.answer, explain: rw.explain, cardId: a.cardId, stakes: 'Correct: +3 points.',
+      answer: rw.answer, explain: rw.explain, cardId: a.cardId, stakes: 'Wrong answer: you draw 1 card.',
       purpose: { type: 'realworld', cardId: a.cardId, property: a.property },
     });
     return;
   }
 
-  // Power-ups
+  // Power-ups (all wild)
+  let steps = 1;
   switch (def.effect) {
     case 'waterPower':
-      if (a.choice === 'draw') drawCards(s, ctx, me.id, 2);
-      else if (a.choice === 'points') me.score += 3;
-      else me.shield = 1;
-      log(s, ctx, `⭐ ${me.name} used Water Power: ${a.choice === 'draw' ? 'drew 2 cards' : a.choice === 'points' ? '+3 points' : 'gained a Shield'}.`, 'play', me.id);
+      if (a.choice === 'draw') {
+        log(s, ctx, `⭐ ${me.name} used Water Power: next player draws 2.`, 'play', me.id);
+        nextDraws(2, 'Water Power');
+      } else if (a.choice === 'points') {
+        const nid = nextId();
+        log(s, ctx, `⭐ ${me.name} used Water Power: skip ${nameOf(s, nid)}.`, 'play', me.id);
+        if (!classicShieldBlocks(s, ctx, nid, 'the skip')) steps = 2;
+      } else {
+        me.shield = 1;
+        log(s, ctx, `⭐ ${me.name} used Water Power: gained a Shield.`, 'play', me.id);
+      }
       break;
     case 'wildBond':
       s.activeProperty = a.property!;
-      log(s, ctx, `🔗 ${me.name} played Wild Bond: active property is now ${PROPERTY_LABEL[a.property!]}.`, 'play', me.id);
+      log(s, ctx, `🔗 ${me.name} played Wild Bond: the color is now ${PROPERTY_LABEL[a.property!]}.`, 'play', me.id);
       break;
     case 'hbond':
-      me.boost = true;
-      log(s, ctx, `⚡ ${me.name} played H-Bond Boost: next property card scores double!`, 'play', me.id);
+      log(s, ctx, `⚡ ${me.name} played H-Bond Boost and takes another turn!`, 'play', me.id);
+      steps = 0;
       break;
     case 'shield':
       me.shield = 1;
       log(s, ctx, `🛡️ ${me.name} raised a Surface Shield.`, 'play', me.id);
       break;
     case 'rain':
-      me.score += 2;
-      log(s, ctx, `🌧️ ${me.name} played Rain Refill (+2).`, 'play', me.id);
+      log(s, ctx, `🌧️ ${me.name} played Rain Refill.`, 'play', me.id);
+      nextDraws(2, 'Rain Refill');
       break;
     case 'star': {
       log(s, ctx, `🌟 ${me.name} played Science Star. Bonus question!`, 'science', me.id);
       const topic = pickRandom<Topic>(['cohesion', 'adhesion', 'surface', 'combo'], ctx.rng);
       askBankQuestion(s, ctx, topic, undefined, {
-        responderId: me.id, askerId: me.id, title: 'Science Star', cardId: a.cardId, stakes: 'Correct: +4 points.',
+        responderId: me.id, askerId: me.id, title: 'Science Star', cardId: a.cardId,
+        stakes: 'Correct: take another turn. Wrong: draw 1 card.',
         purpose: { type: 'star', cardId: a.cardId },
       });
       return;
     }
   }
-  return finishTurn(s, ctx);
+  return finishTurn(s, ctx, steps);
 }
 
 function doSwap(s: GameState, ctx: Ctx, meId: string, targetId: string, giveCardId: string) {

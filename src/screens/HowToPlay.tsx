@@ -31,27 +31,22 @@ const EXAMPLES: Record<Property, { art: string; text: string }[]> = {
 export function RulesClassic() {
   return (
     <div className="rules">
-      <p className="lead">Inspired by UNO and Go Fish: match properties, collect sets, and answer science questions. Highest score wins!</p>
+      <p className="lead">Like UNO, but with science. <b>First player to get rid of all their cards wins!</b></p>
       <ol className="steps">
-        <li><b>Setup.</b> Everyone gets 7 cards. One property card starts the pile; its color is the <b>active property</b>.</li>
-        <li><b>Free actions</b> (start of your turn, optional, once each):
+        <li><b>Everyone starts with 5 cards.</b></li>
+        <li><b>Look at the middle pile.</b> The color under it is the active property: <b className="t-cohesion">blue = Cohesion</b>, <b className="t-adhesion">purple = Adhesion</b>, <b className="t-surface">gold = Surface Tension</b>.</li>
+        <li><b>On your turn, play one card that matches that color.</b> Cards you're allowed to play <b>glow</b>. Tap one, then tap <b>Play</b>.</li>
+        <li><b>Nothing glows?</b> Tap <b>Draw a card</b>. If the new card glows you can play it; otherwise tap <b>End turn</b>.</li>
+        <li><b>Special cards:</b>
           <ul>
-            <li><b>Bank a Set:</b> 3 property cards of the same property. Answer a science question: correct = <b>+6</b>, wrong = +2.</li>
-            <li><b>Offer a Trade:</b> give one card to an opponent in exchange for a card of a property you name. They can accept or decline.</li>
+            <li><b>Action</b> (red): skip the next player, reverse the order, make the next player draw 2, and more. An Action card can always go on top of another Action card.</li>
+            <li><b>Challenge</b> (orange): ask an opponent a science question. Wrong answer = they draw 2 cards.</li>
+            <li><b>Real-World</b> (green) and <b>Power-Up</b> (pink) are <b>wild</b>: play them any time. Real-World cards ask you which property an example shows; a wrong answer means you draw 1.</li>
           </ul>
         </li>
-        <li><b>Main action</b> (pick one):
-          <ul>
-            <li><b>Play a card</b> that matches the active property (or the same card, or any wild). Property cards score their points.</li>
-            <li><b>Draw</b> one card, then you may play a card or end your turn.</li>
-            <li><b>Go Fish:</b> ask an opponent for a property. If they have one, you take it and may then play. If not, “Go Fish!”: draw 1 and your turn ends.</li>
-          </ul>
-        </li>
-        <li><b>Challenge cards</b> quiz an opponent. Correct: they score. Wrong: you score and they draw 1.</li>
-        <li><b>Real-World cards</b> are wild: name the property shown (cohesion, adhesion, surface tension, or both cohesion + adhesion). Correct = +3.</li>
-        <li><b>Winning.</b> The first player to empty their hand gets <b>+10</b> and ends the game. Otherwise the game ends after 10 rounds. Highest score wins.</li>
+        <li><b>Win</b> by playing your last card. If nobody does after 20 rounds, whoever has the fewest cards wins.</li>
       </ol>
-      <div className="tip"><Icon name="info" size={16} /> Strategy: banking sets scores big but empties your hand of matching colors. Going out early ends the game for everyone, so time it well!</div>
+      <div className="tip"><Icon name="info" size={16} /> Tip: save your wild cards for when nothing else matches!</div>
     </div>
   );
 }

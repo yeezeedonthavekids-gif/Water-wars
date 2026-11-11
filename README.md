@@ -1,6 +1,6 @@
 # 💧 Water Wars
 
-A real-time multiplayer science card game about the three properties of water: **cohesion**, **adhesion** and **surface tension**. 2 to 6 players join a room with a 5-character code from any phone, tablet or computer, then play **Classic** (UNO + Go Fish) or **Battle** (drop vs. drop) mode. Science questions are part of the moves themselves: banking a set, boosting an attack, classifying a real-world example and challenging an opponent all require answering correctly.
+A real-time multiplayer science card game about the three properties of water: **cohesion**, **adhesion** and **surface tension**. 2 to 6 players join a room with a 5-character code from any phone, tablet or computer, then play **Classic** (UNO-style) or **Battle** (drop vs. drop) mode. Science questions are part of the moves themselves: challenging an opponent, classifying a real-world example and boosting an attack all depend on answering correctly.
 
 <p align="center">
   <img src="docs/screenshots/menu-mobile.png" width="200" alt="Main menu" />
@@ -75,12 +75,13 @@ All configuration lives in Netlify's environment variables. The browser fetches 
 
 Every card is linked to cohesion, adhesion or surface tension. There are **42 unique cards** (67 in the deck) in seven categories: Cohesion, Adhesion, Surface Tension, Challenge, Action, Real-World and Power-Up. The bank holds **40 science questions** plus 6 real-world classification cards, including combination questions such as *"Water rises in a narrow tube. Explain cohesion AND adhesion."* The full rules and a browsable card library with explanations are in the app under **How to Play**.
 
-### Classic mode (UNO + Go Fish), with the highest score winning
-* 7 cards each. Match the **active property** (the color of the pile), play the same card, or play a wild.
-* **Free actions** (start of turn): **Bank a set** of 3 same-property cards and answer a question (correct +6, wrong +2), or **offer a trade** to another player.
-* **Main action:** play a card (property cards score points), **draw**, or **Go Fish** (ask an opponent for a property; if they don't have one, draw and your turn ends).
-* **Challenge cards** quiz an opponent. **Real-world cards** are wild: name the property shown for +3.
-* The first player to empty their hand gets **+10** and ends the game; otherwise it ends after 10 rounds.
+### Classic mode (UNO-style): first to empty their hand wins
+* Everyone starts with 5 cards. The color under the middle pile is the **active property** (blue = Cohesion, purple = Adhesion, gold = Surface Tension).
+* On your turn, play **one card that matches the color**. Playable cards glow. An Action card can always go on another Action card. Real-World and Power-Up cards are **wild**.
+* Nothing matches? **Draw a card**, then play it if it matches or end your turn.
+* **Action cards:** Soap Disruptor skips the next player, Evaporation reverses the order, Capillary Pull makes the next player draw 2, Surfactant Splash makes everyone else draw 1, and more.
+* **Science:** Challenge cards quiz an opponent (wrong answer = they draw 2). Real-World cards ask you to name the property an example shows (wrong = you draw 1). Science Star gives a bonus question (right = take another turn).
+* **Win** by playing your last card. If nobody has after 20 rounds, the fewest cards wins.
 
 ### Battle mode, with the last drop standing winning
 * Every player is a drop with **20 HP**; draw 1 at the start of each turn.

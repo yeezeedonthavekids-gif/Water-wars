@@ -176,10 +176,47 @@ describe('rules enforcement', () => {
     expect(JSON.stringify(pv.pending)).not.toMatch(/"answer"|"explain"|"purpose"/);
     expect(JSON.stringify(pv)).not.toContain('"answer"');
     expect(() => applyGameAction(s, ctx, cur, { type: 'answer', choice: 1 })).toThrow(/someone else/i);
-    const before = s.players.find((p) => p.id === target)!.score;
-    applyGameAction(s, ctx, target, { type: 'answer', choice: 1 }); // s1 answer is index 1
-    expect(s.players.find((p) => p.id === target)!.score).toBe(before + 3);
-    expect(s.lastQuestion?.correct).toBe(true);
+    const before = s.hands[target].length;
+    applyGameAction(s, ctx, target, { type: 'answer', choice: 0 }); // s1 answer is index 1, so this is wrong
+    expect(s.hands[target].length).toBe(before + 2); // wrong answer: draw 2
+    expect(s.lastQuestion?.correct).toBe(false);
+  });
+
+  it('classic is UNO-only: Go Fish, sets and trades are rejected', () => {
+    const { s, ctx } = setup(2, 'classic', seeded(9));
+    const cur = s.players[s.turn!.idx].id;
+    const other = s.players.find((p) => p.id !== cur)!.id;
+    expect(() => applyGameAction(s, ctx, cur, { type: 'ask', targetId: other, property: 'cohesion' })).toThrow(/not allowed/i);
+    expect(() => applyGameAction(s, ctx, cur, { type: 'set', cardIds: s.hands[cur].slice(0, 3) })).toThrow(/not allowed/i);
+    expect(() => applyGameAction(s, ctx, cur, { type: 'trade', targetId: other, giveCardId: s.hands[cur][0], wantProperty: 'adhesion' })).toThrow(/not allowed/i);
+  });
+
+  it('classic: playing your last card wins', () => {
+    const { s, ctx } = setup(3, 'classic', seeded(10));
+    const cur = s.players[s.turn!.idx].id;
+    const top = s.discard[s.discard.length - 1];
+    const card = buildDeckIds().find((c) => defOf(c).category === s.activeProperty && c !== top)!;
+    for (const k of Object.keys(s.hands)) s.hands[k] = s.hands[k].filter((c) => c !== card);
+    s.deck = s.deck.filter((c) => c !== card);
+    s.discard = s.discard.filter((c) => c !== card);
+    s.deck.push(...s.hands[cur]);
+    s.hands[cur] = [card];
+    applyGameAction(s, ctx, cur, { type: 'play', cardId: card });
+    expect(s.phase).toBe('finished');
+    expect(s.winnerIds).toEqual([cur]);
+    expect(s.results![0].cardsLeft).toBe(0);
+  });
+
+  it('classic: H-Bond Boost gives another turn', () => {
+    const { s, ctx } = setup(3, 'classic', seeded(11));
+    const cur = s.players[s.turn!.idx].id;
+    const card = 'pow-hbond~1';
+    for (const k of Object.keys(s.hands)) s.hands[k] = s.hands[k].filter((c) => c !== card);
+    s.deck = s.deck.filter((c) => c !== card);
+    s.discard = s.discard.filter((c) => c !== card);
+    s.hands[cur].push(card);
+    applyGameAction(s, ctx, cur, { type: 'play', cardId: card });
+    expect(s.players[s.turn!.idx].id).toBe(cur);
   });
 
   it('the public view never includes hands or the deck order', () => {
@@ -238,6 +275,6 @@ describe('fuzz: full random games terminate and conserve cards', () => {
         }
       }
       expect(finished).toBe(300);
-    });
+    }, 120_000);
   }
 });

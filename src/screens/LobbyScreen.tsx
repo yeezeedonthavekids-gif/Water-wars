@@ -15,7 +15,7 @@ export function isOnline(room: RoomState, id: string) {
 }
 
 const MODES: { id: Mode; name: string; tag: string; desc: string; icon: string }[] = [
-  { id: 'classic', name: 'Classic', tag: 'UNO + Go Fish', desc: 'Match properties, bank sets, trade and quiz rivals. Highest score wins.', icon: 'layers' },
+  { id: 'classic', name: 'Classic', tag: 'UNO style', desc: 'Match the color, use action cards, quiz your rivals. First to empty their hand wins.', icon: 'layers' },
   { id: 'battle', name: 'Battle', tag: 'Drop vs. drop', desc: 'Attack with science! Boost with questions, combo properties. Last drop standing.', icon: 'bolt' },
 ];
 

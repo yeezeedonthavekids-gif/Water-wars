@@ -80,7 +80,7 @@ export function ResultsScreen({ room, view, onLeave }: { room: RoomState; view: 
                 <div className="player-name">
                   {r.name} {r.id === room.uid && <span className="you-tag">you</span>}
                   {r.status === 'left' && <span className="muted small"> (left)</span>}
-                  {r.wentOut && <span className="chip chip-sm cat-realworld">Went out</span>}
+                  {r.wentOut && <span className="chip chip-sm cat-realworld">Emptied hand!</span>}
                 </div>
                 <div className="rank-stats">
                   <span title="Correct answers">✅ {r.stats.correct}/{r.stats.correct + r.stats.wrong} answers</span>
@@ -91,7 +91,6 @@ export function ResultsScreen({ room, view, onLeave }: { room: RoomState; view: 
                     </>
                   ) : (
                     <>
-                      <span>🧪 {r.sets} sets</span>
                       <span>🃏 {r.stats.played} played</span>
                     </>
                   )}
@@ -105,8 +104,8 @@ export function ResultsScreen({ room, view, onLeave }: { room: RoomState; view: 
                   </>
                 ) : (
                   <>
-                    <b>{r.score}</b>
-                    <span className="muted small">points</span>
+                    <b>{r.cardsLeft ?? 0}</b>
+                    <span className="muted small">{r.cardsLeft === 1 ? 'card left' : 'cards left'}</span>
                   </>
                 )}
               </div>

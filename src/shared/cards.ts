@@ -6,7 +6,7 @@ export interface CardDef {
   id: string;
   name: string;
   category: Category;
-  /** Concepts this card connects to (used for Classic matching and Go Fish asks). */
+  /** Concepts this card connects to (used for Classic color matching). */
   properties: Property[];
   /** Wild cards can be played on any active property in Classic. */
   wild?: boolean;
@@ -71,7 +71,7 @@ const prop = (
   properties: [category],
   description,
   science,
-  classic: `Match ${PROPERTY_LABEL[category]} to play. Score ${points} point${points === 1 ? '' : 's'}.`,
+  classic: `Play it when the color is ${PROPERTY_LABEL[category]} (or on another ${PROPERTY_LABEL[category]} card).`,
   battle: `Attack for ${points + 1} damage. Boost with a science question to double it!`,
   points,
   power: points + 1,
@@ -163,7 +163,7 @@ export const CARDS: CardDef[] = [
     id: 'chl-merge', name: 'Merge Mystery', category: 'challenge', properties: ['cohesion'],
     description: 'Two drops merge into one. Explain the molecular attraction.',
     science: 'Challenges test an opponent. Cohesion questions focus on water attracting water.',
-    classic: 'Challenge an opponent. Correct: they score 2. Wrong: you score 2 and they draw 1.',
+    classic: 'Quiz an opponent with a science question. Wrong answer: they draw 2 cards.',
     battle: 'Challenge an opponent. Wrong answer: they take 3 damage. Correct: they heal 1.',
     points: 2, power: 3, target: { classic: true, battle: true }, art: 'question', copies: 1,
   },
@@ -171,7 +171,7 @@ export const CARDS: CardDef[] = [
     id: 'chl-window', name: 'Window Detective', category: 'challenge', properties: ['adhesion'],
     description: 'Rain clings to a window. Which interaction explains it?',
     science: 'Challenges test an opponent. Adhesion questions focus on water sticking to other materials.',
-    classic: 'Challenge an opponent. Correct: they score 2. Wrong: you score 2 and they draw 1.',
+    classic: 'Quiz an opponent with a science question. Wrong answer: they draw 2 cards.',
     battle: 'Challenge an opponent. Wrong answer: they take 3 damage. Correct: they heal 1.',
     points: 2, power: 3, target: { classic: true, battle: true }, art: 'magnifier', copies: 1,
   },
@@ -179,7 +179,7 @@ export const CARDS: CardDef[] = [
     id: 'chl-strider', name: 'Strider Secret', category: 'challenge', properties: ['surface'],
     description: 'A water strider stays on top of a pond. Explain how.',
     science: 'Challenges test an opponent. Surface tension questions focus on the "skin" of water.',
-    classic: 'Challenge an opponent. Correct: they score 3. Wrong: you score 3 and they draw 1.',
+    classic: 'Quiz an opponent with a science question. Wrong answer: they draw 2 cards.',
     battle: 'Challenge an opponent. Wrong answer: they take 4 damage. Correct: they heal 1.',
     points: 3, power: 4, target: { classic: true, battle: true }, art: 'question', copies: 1,
   },
@@ -187,7 +187,7 @@ export const CARDS: CardDef[] = [
     id: 'chl-tube', name: 'Capillary Combo', category: 'challenge', properties: ['cohesion', 'adhesion'],
     description: 'Water rises in a narrow tube. Explain cohesion AND adhesion.',
     science: 'Combo challenges need two properties working together.',
-    classic: 'Combo challenge! Correct: they score 4. Wrong: you score 4 and they draw 1.',
+    classic: 'Combo quiz for an opponent. Wrong answer: they draw 2 cards.',
     battle: 'Combo challenge! Wrong answer: they take 5 damage. Correct: they heal 1.',
     points: 4, power: 5, target: { classic: true, battle: true }, art: 'tube', copies: 1,
   },
@@ -195,7 +195,7 @@ export const CARDS: CardDef[] = [
     id: 'chl-tree', name: 'Treetop Express', category: 'challenge', properties: ['cohesion', 'adhesion'],
     description: 'How does water climb from roots to the top of a tall tree?',
     science: 'Combo challenges need two properties working together.',
-    classic: 'Combo challenge! Correct: they score 4. Wrong: you score 4 and they draw 1.',
+    classic: 'Combo quiz for an opponent. Wrong answer: they draw 2 cards.',
     battle: 'Combo challenge! Wrong answer: they take 5 damage. Correct: they heal 1.',
     points: 4, power: 5, target: { classic: true, battle: true }, art: 'tree', copies: 1,
   },
@@ -203,7 +203,7 @@ export const CARDS: CardDef[] = [
     id: 'chl-penny', name: 'Penny Puzzle', category: 'challenge', properties: ['cohesion', 'surface'],
     description: 'A penny holds many drops before spilling. Which properties explain it?',
     science: 'Combo challenges need two properties working together.',
-    classic: 'Combo challenge! Correct: they score 4. Wrong: you score 4 and they draw 1.',
+    classic: 'Combo quiz for an opponent. Wrong answer: they draw 2 cards.',
     battle: 'Combo challenge! Wrong answer: they take 5 damage. Correct: they heal 1.',
     points: 4, power: 5, target: { classic: true, battle: true }, art: 'penny', copies: 1,
   },
@@ -244,8 +244,8 @@ export const CARDS: CardDef[] = [
   {
     id: 'act-grab', name: 'Droplet Grab', category: 'action', properties: ['cohesion'], effect: 'grab',
     description: 'Big drops pull in smaller ones.',
-    science: 'When drops touch, cohesion pulls them together, so a big drop absorbs the little drop next to it.',
-    classic: 'Take a random card from an opponent who has 2 or more cards.',
+    science: 'When drops touch, cohesion pulls them together, so a little drop gets absorbed into the big drop next to it.',
+    classic: 'Push one of your cards into an opponent\'s hand.',
     battle: 'Take a random card from an opponent.',
     points: 1, power: 0, target: { classic: true, battle: true }, art: 'grab', copies: 2,
   },
@@ -269,7 +269,7 @@ export const CARDS: CardDef[] = [
   ] as const).map(([id, name, description, art]): CardDef => ({
     id, name, category: 'realworld', properties: [], wild: true, description,
     science: 'Play this card to classify the example. The science is revealed after you answer!',
-    classic: 'Wild. Name the property this shows: correct scores 3 and sets the new color.',
+    classic: 'Wild. Name the property this example shows. Wrong answer: you draw 1 card.',
     battle: 'Name the property this shows: correct deals 3 damage to your target.',
     points: 3, power: 3, target: { battle: true }, art, copies: 1,
   })),
@@ -278,9 +278,9 @@ export const CARDS: CardDef[] = [
   {
     id: 'pow-water', name: 'Water Power!', category: 'powerup', properties: ['cohesion', 'adhesion', 'surface'], wild: true,
     effect: 'waterPower',
-    description: 'Choose one: draw 2 cards, gain points, or a protective shield.',
+    description: 'Unleash the power of water!',
     science: 'Water is powerful because cohesion, adhesion, and surface tension all come from its polar molecules.',
-    classic: 'Wild. Choose: draw 2, score 3, or gain a Shield.',
+    classic: 'Wild. Choose: next player draws 2, skip the next player, or gain a Shield.',
     battle: 'Free action. Choose: draw 2, heal 3, or a 3-point Shield.',
     points: 0, power: 0, art: 'hero', copies: 2,
   },
@@ -289,7 +289,7 @@ export const CARDS: CardDef[] = [
     effect: 'wildBond',
     description: 'Hydrogen bonds connect to anything polar.',
     science: 'The same polarity that causes cohesion also lets water bond with other polar materials (adhesion).',
-    classic: 'Wild. Choose the new active property.',
+    classic: 'Wild. Choose the next color.',
     battle: 'Free action. Draw 1 card and heal 2.',
     points: 0, power: 0, art: 'bond', copies: 1,
   },
@@ -297,7 +297,7 @@ export const CARDS: CardDef[] = [
     id: 'pow-hbond', name: 'H-Bond Boost', category: 'powerup', properties: ['cohesion'], wild: true, effect: 'hbond',
     description: 'Extra-strong hydrogen bonding!',
     science: 'Hydrogen bonds are much stronger than the attractions between most other small molecules. That is why water has such strong cohesion.',
-    classic: 'Wild. Your next property card scores double.',
+    classic: 'Wild. Take another turn right away.',
     battle: 'Free action. Your next attack deals double damage.',
     points: 0, power: 0, art: 'bolt', copies: 1,
   },
@@ -313,7 +313,7 @@ export const CARDS: CardDef[] = [
     id: 'pow-rain', name: 'Rain Refill', category: 'powerup', properties: ['cohesion'], wild: true, effect: 'rain',
     description: 'Fresh rain fills your drop back up.',
     science: 'Raindrops form as cohesion pulls tiny cloud droplets together into drops heavy enough to fall.',
-    classic: 'Wild. Score 2 points.',
+    classic: 'Wild. The next player draws 2 cards.',
     battle: 'Free action. Heal 5.',
     points: 0, power: 0, art: 'cloud', copies: 1,
   },
@@ -322,7 +322,7 @@ export const CARDS: CardDef[] = [
     effect: 'star',
     description: 'Answer a bonus science question.',
     science: 'Scientists explain what they observe using evidence. Answer correctly to earn the reward.',
-    classic: 'Wild. Bonus question: correct scores 4.',
+    classic: 'Wild. Bonus question: correct = take another turn, wrong = draw 1.',
     battle: 'Free action. Bonus question: correct heals 4 and draws 1.',
     points: 0, power: 0, art: 'star', copies: 1,
   },
@@ -357,5 +357,7 @@ export function classicPlayable(c: CardDef, active: Property | null, topId: stri
   if (!active) return true;
   if (c.properties.includes(active)) return true;
   if (topId && defOf(topId).id === c.id) return true;
+  // Like UNO's matching symbols: an Action card can always follow another Action card.
+  if (topId && c.category === 'action' && defOf(topId).category === 'action') return true;
   return false;
 }

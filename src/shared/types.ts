@@ -142,6 +142,7 @@ export interface ResultRow {
   status: PlayerStatus;
   stats: PlayerStats;
   wentOut?: boolean;
+  cardsLeft?: number;
 }
 
 export interface PublicView {

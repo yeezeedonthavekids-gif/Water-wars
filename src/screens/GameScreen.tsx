@@ -8,16 +8,14 @@ import type { GameAction, PublicView } from '../shared/types';
 import { Icon } from '../components/Icons';
 import { Avatar, CardBack, CardDetail, CardView, Modal, useToast } from '../components/ui';
 import {
-  AskDialog, Countdown, EventFeed, HpBar, LogList, OpponentChip, PlayDialog, QuestionModal, QuestionResultModal,
-  Scoreboard, TradeDialog, TradeResponseModal, useDelta, useTick,
+  Countdown, EventFeed, HpBar, LogList, OpponentChip, PlayDialog, QuestionModal, QuestionResultModal,
+  Scoreboard, useDelta, useTick,
 } from './GameParts';
 import { RulesBattle, RulesClassic } from './HowToPlay';
 
 type Dialog =
   | { kind: 'play'; cardId: string }
   | { kind: 'detail'; cardId: string }
-  | { kind: 'ask' }
-  | { kind: 'trade' }
   | { kind: 'log' }
   | { kind: 'leave' }
   | { kind: 'rules' }
@@ -38,7 +36,6 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
   const hand = room.hand;
 
   const [selected, setSelected] = useState<string | null>(null);
-  const [setPick, setSetPick] = useState<string[] | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [busy, setBusy] = useState(false);
   const [resultShown, setResultShown] = useState<string | null>(view.lastQuestion?.id ?? null);
@@ -67,12 +64,10 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
   // Clear selections when the turn changes or cards leave the hand.
   useEffect(() => {
     if (selected && !hand.includes(selected)) setSelected(null);
-    if (setPick && setPick.some((c) => !hand.includes(c))) setSetPick(null);
-  }, [hand, selected, setPick]);
+  }, [hand, selected]);
   useEffect(() => {
     if (!myTurn) {
-      setSetPick(null);
-      setDialog((d) => (d && (d.kind === 'play' || d.kind === 'ask' || d.kind === 'trade') ? null : d));
+      setDialog((d) => (d && d.kind === 'play' ? null : d));
     }
   }, [myTurn]);
 
@@ -153,27 +148,7 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
     return classicPlayable(d, view.activeProperty, top);
   };
 
-  const possibleSets = useMemo(() => {
-    const groups: Record<string, string[]> = {};
-    for (const c of hand) {
-      const d = defOf(c);
-      if (isPropertyCard(d)) (groups[d.category] ??= []).push(c);
-    }
-    return Object.values(groups).filter((g) => g.length >= 3);
-  }, [hand]);
-
   const onCardTap = (c: string) => {
-    if (setPick) {
-      const d = defOf(c);
-      if (!isPropertyCard(d)) return toast('Sets use property cards only.', 'info');
-      setSetPick((s) => {
-        if (!s) return s;
-        if (s.includes(c)) return s.filter((x) => x !== c);
-        if (s.length && defOf(s[0]).category !== d.category) return [c];
-        return s.length >= 3 ? s : [...s, c];
-      });
-      return;
-    }
     sfx('click');
     setSelected((s) => (s === c ? null : c));
   };
@@ -181,22 +156,13 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
   const playSelected = async () => {
     if (!selected) return;
     const d = defOf(selected);
-    const needsDialog = needsTarget(d, mode) || d.effect === 'swap' || d.effect === 'waterPower' || (!battle && d.effect === 'wildBond') || (battle && isPropertyCard(d));
+    const needsDialog = needsTarget(d, mode) || d.effect === 'swap' || (!battle && d.effect === 'grab') || d.effect === 'waterPower' || (!battle && d.effect === 'wildBond') || (battle && isPropertyCard(d));
     if (needsDialog) return setDialog({ kind: 'play', cardId: selected });
     if (await send({ type: 'play', cardId: selected })) setSelected(null);
   };
 
-  const confirmSet = async () => {
-    if (!setPick || setPick.length !== 3) return;
-    if (await send({ type: 'set', cardIds: setPick })) setSetPick(null);
-  };
-
-  const startSet = () => {
-    setSelected(null);
-    setSetPick(possibleSets.length === 1 ? possibleSets[0].slice(0, 3) : []);
-  };
-
-  const myScoreDelta = useDelta(battle ? me.hp : me.score);
+  const myScoreDelta = useDelta(battle ? me.hp : 0);
+  const anyPlayable = hand.some((c) => playable(c));
   const turnTotal = 90000;
   const activeColor = view.activeProperty ? `cat-${view.activeProperty}` : '';
 
@@ -204,12 +170,10 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
   let hint = '';
   if (me.status === 'out') hint = 'Your drop evaporated. Watch and cheer!';
   else if (!myTurn) hint = current ? `Waiting for ${current.name}…` : '';
-  else if (pending?.kind === 'trade') hint = 'Waiting for the trade response…';
   else if (pending) hint = '';
-  else if (setPick) hint = `Pick 3 matching property cards (${setPick.length}/3)`;
   else if (battle) hint = view.turn?.powerDone ? 'Play one card, or Rest.' : 'Use a Power-Up (free), then play one card or Rest.';
-  else if (stage === 'afterDraw') hint = 'Play a matching card, or end your turn.';
-  else hint = `Match ${view.activeProperty ? PROPERTY_LABEL[view.activeProperty] : 'any property'}, draw, or Go Fish.`;
+  else if (stage === 'afterDraw') hint = anyPlayable ? 'You can play a glowing card now, or end your turn.' : 'Still no match. Tap End turn.';
+  else hint = anyPlayable ? 'Tap a glowing card, then tap Play.' : 'No card matches. Tap Draw.';
 
   const selDef = selected ? defOf(selected) : null;
 
@@ -311,9 +275,8 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
               me.status === 'out' ? <div className="ko-tag">KO</div> : <HpBar hp={me.hp} shield={me.shield} />
             ) : (
               <div className="me-score">
-                <b>{me.score}</b> pts
+                <b>{hand.length}</b> {hand.length === 1 ? 'card left!' : 'cards left'}
                 {me.shield > 0 && <span className="chip chip-sm"><Icon name="shield" size={12} /> Shield</span>}
-                {me.sets > 0 && <span className="sets-tag">{me.sets}× set</span>}
               </div>
             )}
           </div>
@@ -328,14 +291,7 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
       </section>
 
       <section className="actions">
-        {setPick ? (
-          <>
-            <button className="btn btn-secondary btn-sm" onClick={() => setSetPick(null)}>Cancel</button>
-            <button className="btn btn-primary btn-sm" disabled={setPick.length !== 3 || busy} onClick={confirmSet}>
-              <Icon name="layers" size={16} /> Bank set ({setPick.length}/3)
-            </button>
-          </>
-        ) : selected && selDef ? (
+        {selected && selDef ? (
           <>
             <button className="btn btn-ghost btn-sm" onClick={() => setSelected(null)}>Cancel</button>
             <button className="btn btn-secondary btn-sm" onClick={() => setDialog({ kind: 'detail', cardId: selected })}>
@@ -353,28 +309,13 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
               <Icon name="rest" size={16} /> Rest (draw 1, heal 1)
             </button>
           ) : stage === 'afterDraw' ? (
-            <button className="btn btn-primary btn-sm" disabled={!canAct} onClick={() => send({ type: 'endTurn' })}>
+            <button className={`btn btn-primary btn-sm ${anyPlayable ? '' : 'glow-btn'}`} disabled={!canAct} onClick={() => send({ type: 'endTurn' })}>
               <Icon name="next" size={16} /> End turn
             </button>
           ) : (
-            <>
-              <button className="btn btn-primary btn-sm" disabled={!canAct} onClick={() => send({ type: 'draw' })}>
-                <Icon name="deck" size={16} /> Draw
-              </button>
-              <button className="btn btn-secondary btn-sm" disabled={!canAct} onClick={() => setDialog({ kind: 'ask' })}>
-                <Icon name="fish" size={16} /> Go Fish
-              </button>
-              {!view.turn?.setDone && possibleSets.length > 0 && (
-                <button className="btn btn-secondary btn-sm glow-btn" disabled={!canAct} onClick={startSet}>
-                  <Icon name="layers" size={16} /> Bank set
-                </button>
-              )}
-              {!view.turn?.tradeDone && (
-                <button className="btn btn-secondary btn-sm" disabled={!canAct || !hand.length} onClick={() => setDialog({ kind: 'trade' })}>
-                  <Icon name="swap" size={16} /> Trade
-                </button>
-              )}
-            </>
+            <button className={`btn btn-sm ${anyPlayable ? 'btn-secondary' : 'btn-primary glow-btn'}`} disabled={!canAct} onClick={() => send({ type: 'draw' })}>
+              <Icon name="deck" size={16} /> Draw a card
+            </button>
           )
         ) : null}
       </section>
@@ -383,16 +324,15 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
         {hand.length === 0 && <div className="hand-empty muted">{me.status === 'active' ? 'No cards' : ''}</div>}
         {hand.map((c, i) => {
           const can = playable(c);
-          const inSet = setPick?.includes(c);
           return (
             <div key={c} className={`hand-slot ${fresh.has(c) ? 'is-new' : ''}`} style={{ animationDelay: `${Math.min(i, 8) * 45}ms` }}>
               <CardView
                 id={c}
                 size="sm"
                 mode={mode}
-                selected={selected === c || inSet}
-                glow={can && !setPick}
-                dim={myTurn && !pending && !can && !setPick}
+                selected={selected === c}
+                glow={can}
+                dim={myTurn && !pending && !can}
                 onClick={() => onCardTap(c)}
               />
             </div>
@@ -404,15 +344,6 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
 
       {pending?.kind === 'question' && (
         <QuestionModal pending={pending} view={view} uid={uid} busy={busy} onAnswer={(i) => send({ type: 'answer', choice: i })} />
-      )}
-      {pending?.kind === 'trade' && pending.toId === uid && (
-        <TradeResponseModal pending={pending} view={view} hand={hand} busy={busy} onRespond={(accept, cardId) => send({ type: 'tradeRespond', accept, cardId })} />
-      )}
-      {pending?.kind === 'trade' && pending.toId !== uid && (
-        <div className="question-pill static">
-          <Icon name="swap" size={16} /> Waiting for {view.players.find((p) => p.id === pending.toId)?.name} to answer the trade…
-          <Countdown deadline={pending.deadline} total={30000} compact />
-        </div>
       )}
       {!pending && showResult && <QuestionResultModal result={showResult} view={view} uid={uid} onClose={closeResult} />}
 
@@ -431,12 +362,6 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
             }
           }}
         />
-      )}
-      {dialog?.kind === 'ask' && (
-        <AskDialog view={view} uid={uid} busy={busy} onClose={() => setDialog(null)} onAsk={async (t, p) => { if (await send({ type: 'ask', targetId: t, property: p })) setDialog(null); }} />
-      )}
-      {dialog?.kind === 'trade' && (
-        <TradeDialog view={view} uid={uid} hand={hand} busy={busy} onClose={() => setDialog(null)} onTrade={async (t, g, w) => { if (await send({ type: 'trade', targetId: t, giveCardId: g, wantProperty: w })) setDialog(null); }} />
       )}
       <Modal open={dialog?.kind === 'detail'} onClose={() => setDialog(null)} wide>
         {dialog?.kind === 'detail' && <CardDetail id={dialog.cardId} mode={mode} />}

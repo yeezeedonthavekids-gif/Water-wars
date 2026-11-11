@@ -149,7 +149,7 @@ export interface CardViewProps {
 
 export function cardValue(def: CardDef, mode: Mode) {
   if (mode === 'battle') return def.power > 0 ? { v: def.power, label: 'DMG' } : null;
-  return def.points > 0 ? { v: def.points, label: 'PTS' } : null;
+  return null; // Classic has no points: first to empty their hand wins
 }
 
 export const CardView = memo(function CardView({ id, size = 'md', mode = 'classic', selected, dim, glow, onClick, className = '', style }: CardViewProps) {

@@ -83,7 +83,7 @@ export function OpponentChip({
   const answering = view.pending?.kind === 'question' && view.pending.responderId === p.id;
   const trading = view.pending?.kind === 'trade' && view.pending.toId === p.id;
   const online = isOnline(room, p.id);
-  const scoreDelta = useDelta(p.score);
+  const cardDelta = useDelta(p.handCount);
   const hpDelta = useDelta(p.hp);
   const prevHp = useRef(p.hp);
   const [hit, setHit] = useState(false);
@@ -119,15 +119,16 @@ export function OpponentChip({
           p.status === 'out' ? <div className="ko-tag">KO</div> : <HpBar hp={p.hp} shield={p.shield} />
         ) : (
           <div className="opp-score">
-            <b>{p.score}</b> pts
+            <b>{p.handCount}</b> {p.handCount === 1 ? 'card left!' : 'cards'}
             {p.shield > 0 && <Icon name="shield" size={12} className="shield-ico" />}
-            {p.sets > 0 && <span className="sets-tag">{p.sets}× set</span>}
           </div>
         )}
         <div className="opp-meta">
-          <span className="hand-count">
-            <Icon name="deck" size={12} /> {p.handCount}
-          </span>
+          {battle && (
+            <span className="hand-count">
+              <Icon name="deck" size={12} /> {p.handCount}
+            </span>
+          )}
           {p.boost && <span className="boost-tag" title="H-Bond Boost ready"><Icon name="bolt" size={11} /></span>}
           {answering && <span className="status-tag">answering…</span>}
           {trading && <span className="status-tag">trading…</span>}
@@ -135,9 +136,9 @@ export function OpponentChip({
           {p.status === 'left' && <span className="status-tag off">left</span>}
         </div>
       </div>
-      {scoreDelta && !battle && scoreDelta.v !== 0 && (
-        <span key={scoreDelta.k} className={`float-delta ${scoreDelta.v > 0 ? 'up' : 'down'}`}>
-          {scoreDelta.v > 0 ? `+${scoreDelta.v}` : scoreDelta.v}
+      {cardDelta && !battle && cardDelta.v !== 0 && (
+        <span key={cardDelta.k} className={`float-delta ${cardDelta.v < 0 ? 'up' : 'down'}`}>
+          {cardDelta.v > 0 ? `+${cardDelta.v} 🃏` : `${cardDelta.v} 🃏`}
         </span>
       )}
       {hpDelta && battle && hpDelta.v !== 0 && (
@@ -169,7 +170,7 @@ export function EventFeed({ log }: { log: LogEntry[] }) {
 export function Scoreboard({ view, uid }: { view: PublicView; uid: string }) {
   const battle = view.mode === 'battle';
   const sorted = [...view.players].sort((a, b) =>
-    battle ? (a.status === 'active' ? 0 : 1) - (b.status === 'active' ? 0 : 1) || b.hp - a.hp || b.score - a.score : b.score - a.score,
+    battle ? (a.status === 'active' ? 0 : 1) - (b.status === 'active' ? 0 : 1) || b.hp - a.hp || b.score - a.score : a.handCount - b.handCount,
   );
   return (
     <ol className="scoreboard">
@@ -178,7 +179,7 @@ export function Scoreboard({ view, uid }: { view: PublicView; uid: string }) {
           <span className="sb-rank">{i + 1}</span>
           <Avatar index={p.avatar} size={24} name={p.name} />
           <span className="sb-name">{p.name}{p.id === uid ? ' (you)' : ''}</span>
-          <span className="sb-val">{battle ? (p.status === 'out' ? 'KO' : `${p.hp} HP`) : `${p.score}`}</span>
+          <span className="sb-val">{battle ? (p.status === 'out' ? 'KO' : `${p.hp} HP`) : `${p.handCount} 🃏`}</span>
         </li>
       ))}
     </ol>
@@ -303,51 +304,6 @@ export function QuestionResultModal({ result, view, uid, onClose }: { result: Qu
   );
 }
 
-// ───────── Trade response ─────────
-export function TradeResponseModal({
-  pending, view, hand, onRespond, busy,
-}: { pending: Extract<PublicPending, { kind: 'trade' }>; view: PublicView; hand: string[]; onRespond: (accept: boolean, cardId?: string) => void; busy: boolean }) {
-  const from = view.players.find((p) => p.id === pending.fromId);
-  const eligible = hand.filter((c) => {
-    const d = defOf(c);
-    return !d.wild && d.properties.includes(pending.wantProperty);
-  });
-  const [pick, setPick] = useState<string | null>(eligible[0] ?? null);
-  return (
-    <Modal open dismissable={false} title="Trade offer!" className="trade-modal">
-      <div className="q-head">
-        <p>
-          <b>{from?.name}</b> offers you this card for one of your <b className={`t-${pending.wantProperty}`}>{PROPERTY_LABEL[pending.wantProperty]}</b> cards.
-        </p>
-        <Countdown deadline={pending.deadline} total={30000} compact />
-      </div>
-      <div className="trade-offer">
-        <CardView id={pending.giveCardId} size="md" mode={view.mode} />
-      </div>
-      {eligible.length ? (
-        <>
-          <div className="pick-label">Choose a card to give back:</div>
-          <div className="pick-cards">
-            {eligible.map((c) => (
-              <CardView key={c} id={c} size="sm" mode={view.mode} selected={pick === c} onClick={() => setPick(c)} />
-            ))}
-          </div>
-        </>
-      ) : (
-        <p className="muted">You have no {PROPERTY_LABEL[pending.wantProperty]} cards to trade.</p>
-      )}
-      <div className="btn-row">
-        <button className="btn btn-secondary" disabled={busy} onClick={() => onRespond(false)}>
-          Decline
-        </button>
-        <button className="btn btn-primary" disabled={busy || !pick} onClick={() => onRespond(true, pick!)}>
-          Accept trade
-        </button>
-      </div>
-    </Modal>
-  );
-}
-
 // ───────── Pickers ─────────
 function TargetPicker({
   view, uid, value, onChange, filter,
@@ -421,12 +377,11 @@ export function PlayDialog({
   );
   const wantTarget = needsTarget(def, mode);
   const isAttack = battle && isPropertyCard(def);
-  const wantGive = def.effect === 'swap';
+  const wantGive = def.effect === 'swap' || (!battle && def.effect === 'grab');
   const wantProp = !battle && def.effect === 'wildBond';
   const wantChoice = def.effect === 'waterPower';
   const targetFilter = (p: PublicPlayer) => {
-    if (def.effect === 'grab' && !battle && p.handCount < 2) return 'needs 2+ cards';
-    if ((def.effect === 'grab' || def.effect === 'swap') && p.handCount < 1) return 'no cards';
+    if ((battle && def.effect === 'grab') || def.effect === 'swap') return p.handCount < 1 ? 'no cards' : null;
     return null;
   };
 
@@ -446,7 +401,7 @@ export function PlayDialog({
 
   const choiceLabels: Record<WaterPowerChoice, [string, string]> = battle
     ? { draw: ['Draw 2', 'Two more cards'], points: ['Heal 3', 'Restore HP'], shield: ['Shield 3', 'Absorb damage'] }
-    : { draw: ['Draw 2', 'More options'], points: ['+3 points', 'Score now'], shield: ['Shield', 'Block next attack'] };
+    : { draw: ['Next draws 2', 'Next player draws 2 cards'], points: ['Skip next', 'Next player loses a turn'], shield: ['Shield', 'Block the next attack on you'] };
 
   return (
     <Modal open onClose={onClose} title={`Play ${def.name}`} className="play-dialog" wide>
@@ -489,7 +444,7 @@ export function PlayDialog({
           )}
           {wantGive && (
             <section>
-              <h3>Card to give away</h3>
+              <h3>{def.effect === 'grab' ? 'Card to push into their hand' : 'Card to give away'}</h3>
               <CardPicker cards={others} value={give} onChange={setGive} mode={mode} />
             </section>
           )}
@@ -526,51 +481,6 @@ export function PlayDialog({
             </button>
           </div>
         </div>
-      </div>
-    </Modal>
-  );
-}
-
-export function AskDialog({ view, uid, onAsk, onClose, busy }: { view: PublicView; uid: string; onAsk: (t: string, p: Property) => void; onClose: () => void; busy: boolean }) {
-  const [target, setTarget] = useState<string | null>(null);
-  const [prop, setProp] = useState<Property | null>(null);
-  return (
-    <Modal open onClose={onClose} title="🎣 Go Fish" className="play-dialog">
-      <p className="muted small">Ask an opponent for a property. If they have one, you take it and may play. If not, you draw 1 and your turn ends.</p>
-      <h3>Ask who?</h3>
-      <TargetPicker view={view} uid={uid} value={target} onChange={setTarget} filter={(p) => (p.handCount < 2 ? 'too few cards' : null)} />
-      <h3>For which property?</h3>
-      <PropertyPicker value={prop} onChange={setProp} />
-      <div className="btn-row">
-        <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-        <button className="btn btn-primary" disabled={!target || !prop || busy} onClick={() => onAsk(target!, prop!)}>
-          Ask
-        </button>
-      </div>
-    </Modal>
-  );
-}
-
-export function TradeDialog({
-  view, uid, hand, onTrade, onClose, busy,
-}: { view: PublicView; uid: string; hand: string[]; onTrade: (t: string, give: string, want: Property) => void; onClose: () => void; busy: boolean }) {
-  const [target, setTarget] = useState<string | null>(null);
-  const [give, setGive] = useState<string | null>(null);
-  const [prop, setProp] = useState<Property | null>(null);
-  return (
-    <Modal open onClose={onClose} title="🤝 Offer a trade" className="play-dialog" wide>
-      <p className="muted small">Offer one of your cards for a card of the property you need. They choose whether to accept.</p>
-      <h3>You give</h3>
-      <CardPicker cards={hand} value={give} onChange={setGive} mode={view.mode} />
-      <h3>Trade with</h3>
-      <TargetPicker view={view} uid={uid} value={target} onChange={setTarget} filter={(p) => (p.handCount < 1 ? 'no cards' : null)} />
-      <h3>You want a…</h3>
-      <PropertyPicker value={prop} onChange={setProp} />
-      <div className="btn-row">
-        <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-        <button className="btn btn-primary" disabled={!target || !give || !prop || busy} onClick={() => onTrade(target!, give!, prop!)}>
-          Offer trade
-        </button>
       </div>
     </Modal>
   );
