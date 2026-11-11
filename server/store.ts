@@ -5,8 +5,8 @@
 //    Clients then fetch their own view from the API; broadcast payloads are never trusted.
 import { createHmac } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { ClientConfig } from '../src/shared/types';
-import { GameError, type Ctx, type GameState } from './engine';
+import type { ClientConfig } from '../src/shared/types.js';
+import { GameError, type Ctx, type GameState } from './engine.js';
 
 export type Mutator = (s: GameState, ctx: Ctx) => 'deleted' | unknown;
 

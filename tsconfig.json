@@ -15,5 +15,5 @@
     "noEmit": true,
     "types": ["node", "vite/client"]
   },
-  "include": ["src", "server", "netlify", "scripts", "tests"]
+  "include": ["src", "server", "netlify", "functions", "api", "scripts", "tests"]
 }

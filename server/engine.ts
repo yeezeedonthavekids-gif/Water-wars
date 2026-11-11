@@ -2,13 +2,13 @@
 // Pure functions that mutate a GameState. No I/O; randomness and time are injected.
 import {
   buildDeckIds, classicPlayable, defOf, isPropertyCard, isStackable, needsTarget, PROPERTY_LABEL, type CardDef,
-} from '../src/shared/cards';
+} from '../src/shared/cards.js';
 import {
   BATTLE_HP, MAX_PLAYERS, MIN_PLAYERS,
   type GameAction, type LastAction, type LogEntry, type Mode, type Phase, type PlayerStats, type PlayerStatus,
   type Property, type QuestionResult, type ResultRow,
-} from '../src/shared/types';
-import { CHALLENGE_QUESTION, CLASSIFY_OPTIONS, QUESTION_MAP, QUESTIONS, REALWORLD, type Topic } from './answers';
+} from '../src/shared/types.js';
+import { CHALLENGE_QUESTION, CLASSIFY_OPTIONS, QUESTION_MAP, QUESTIONS, REALWORLD, type Topic } from './answers.js';
 
 export class GameError extends Error {
   constructor(public code: string, message: string) {

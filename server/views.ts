@@ -1,7 +1,7 @@
 // Projects the full server state into what each client may see.
-import type { PublicPending, PublicView } from '../src/shared/types';
-import { BATTLE_HP } from '../src/shared/types';
-import { currentRoundInfo, type GameState } from './engine';
+import type { PublicPending, PublicView } from '../src/shared/types.js';
+import { BATTLE_HP } from '../src/shared/types.js';
+import { currentRoundInfo, type GameState } from './engine.js';
 
 export function publicView(s: GameState): PublicView {
   const { round, maxRounds } = currentRoundInfo(s);

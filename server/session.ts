@@ -1,7 +1,7 @@
 // Player identity without any sign-up: the server hands each browser a random id plus an HMAC signature.
 // Clients can't forge another player's token without the server-only secret.
 import { timingSafeEqual } from 'node:crypto';
-import { sign } from './store';
+import { sign } from './store.js';
 
 export function newSession() {
   const uid = Buffer.from(crypto.getRandomValues(new Uint8Array(15))).toString('base64url');

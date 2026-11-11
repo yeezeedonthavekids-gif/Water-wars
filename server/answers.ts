@@ -1,5 +1,5 @@
 // SERVER-ONLY answer key. Never import this from src/ (the browser bundle).
-import type { Property } from '../src/shared/types';
+import type { Property } from '../src/shared/types.js';
 
 export type Topic = Property | 'combo';
 

@@ -1,17 +1,17 @@
 // HTTP handler for the game API. Used by the Netlify function and the local dev server.
 // Clients never write game state: they send intents here, the engine validates them, and the result is
 // committed with optimistic concurrency in Supabase.
-import type { ApiRequest, ApiResponse, Mode, RoomSnapshot } from '../src/shared/types';
+import type { ApiRequest, ApiResponse, Mode, RoomSnapshot } from '../src/shared/types.js';
 import {
   applyGameAction, claimHost, createState, GameError, joinRoom, kickPlayer, leaveRoom, rematch, renamePlayer,
   setMode, setReady, startGame, type GameState,
-} from './engine';
-import { newSession, verifySession } from './session';
+} from './engine.js';
+import { newSession, verifySession } from './session.js';
 import {
   cleanupOldRooms, clientConfig, createRoom, missingConfig, mutateRoom, offlinePlayers, readRoom, roomTopic, touch,
   type Mutator,
-} from './store';
-import { publicView } from './views';
+} from './store.js';
+import { publicView } from './views.js';
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_RE = /^[A-Z2-9]{5}$/;

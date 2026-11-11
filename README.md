@@ -23,7 +23,7 @@ A real-time multiplayer science card game about the three properties of water: *
 
 ## Deploying (about 10 minutes)
 
-Netlify hosts the website and the game server (a Netlify Function). **Supabase** (free plan) stores the games and pushes live updates to every device. Netlify can't keep live connections open itself, so you need both. No credit card is required for either.
+Netlify hosts the website and the game server (a Netlify Function). Prefer no deploy limits? See [Alternative hosts](#alternative-hosts-free-no-deploy-credit-limits) for Cloudflare Pages and Vercel. **Supabase** (free plan) stores the games and pushes live updates to every device. Netlify can't keep live connections open itself, so you need both. No credit card is required for either.
 
 ### Step 1: Create the Supabase backend
 
@@ -55,6 +55,28 @@ Netlify hosts the website and the game server (a Netlify Function). **Supabase**
 4. Open your site URL (e.g. `https://water-wars-xyz.netlify.app`) and share it. Players tap **Play → Create Room**, then share the room code or the **Invite link**.
 
 If something is missing, the site shows a **"Almost ready to play!"** screen listing the variables that still need to be set. If the tables weren't created, starting a room shows a message saying to run `supabase/schema.sql`.
+
+### Alternative hosts (free, no deploy-credit limits)
+
+Netlify's free plan charges 15 credits per production deploy (300 credits/month). The game runs the same on **Cloudflare Pages** or **Vercel**, using the same Supabase project and the same three variables.
+
+#### Cloudflare Pages (recommended: unlimited visitors, 500 deploys/month free)
+1. Go to <https://dash.cloudflare.com> → **Workers & Pages** → **Create** → choose the **Pages** tab → **Import an existing Git repository** (connect GitHub if asked) → pick **Water-wars**.
+2. **Production branch:** `claude/charming-cannon-0o1wj7` (or `main` once merged).
+3. **Framework preset:** None. **Build command:** `npm run build`. **Build output directory:** `dist`.
+4. Open **Environment variables (advanced)** and add `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_SECRET_KEY` (click **Encrypt** on the secret key).
+5. Click **Save and Deploy**. Your game is at `https://<project>.pages.dev`.
+
+The game server is `functions/api/[[path]].ts`. `wrangler.toml` turns on the Node.js compatibility it needs, and Cloudflare picks that file up automatically.
+If you add or change variables later: **Settings → Variables and Secrets**, then **Deployments → Retry deployment**.
+
+#### Vercel (free Hobby plan)
+1. Go to <https://vercel.com/new>, sign in with GitHub, and **Import** the **Water-wars** repository.
+2. Vercel reads `vercel.json` (Vite build, `dist` output, `/api/*` routed to the game server in `api/index.ts`), so leave the build settings alone.
+3. Expand **Environment Variables** and add the same three: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`.
+4. Click **Deploy**. Your game is at `https://<project>.vercel.app`.
+
+To deploy from the `claude/charming-cannon-0o1wj7` branch instead of `main`: **Settings → Environments → Production → Branch Tracking**, or merge the branch into `main`.
 
 ---
 
@@ -122,7 +144,9 @@ src/client/      session/config, API client, realtime room hook, settings, sound
 src/components/  card component, 39 original SVG card illustrations, UI primitives
 src/screens/     Menu, Lobby, Game, Results, How to Play, Settings
 server/          engine.ts (rules), answers.ts (answer key), handler.ts (API), store.ts (Supabase), session.ts, views.ts
-netlify/functions/api.mts   the deployed function (thin wrapper around server/handler.ts)
+netlify/functions/api.mts   Netlify function (thin wrapper around server/handler.ts)
+functions/api/[[path]].ts   Cloudflare Pages function (same handler)
+api/index.ts                Vercel function (same handler)
 supabase/schema.sql         database setup script (also used as the local migration)
 tests/           engine unit + fuzz tests, security integration tests
 ```

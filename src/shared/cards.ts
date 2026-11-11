@@ -1,6 +1,6 @@
 // The Water Wars card database. Public data only: challenge question answers and
 // real-world classifications live server-side (server/answers.ts) so they can't be read from the client bundle.
-import type { Category, EffectId, Mode, Property } from './types';
+import type { Category, EffectId, Mode, Property } from './types.js';
 
 export interface CardDef {
   id: string;

@@ -8,3 +8,5 @@ dist
 firebase-debug.log*
 database-debug.log*
 test-results
+.wrangler
+.vercel

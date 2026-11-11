@@ -121,7 +121,8 @@ code { background: var(--surface-2); padding: 0.1em 0.4em; border-radius: 6px; f
 .link-btn { background: none; border: 0; color: var(--brand); font-weight: 900; padding: 4px 6px; font-size: 0.85rem; }
 .btn-spinner { width: 16px; height: 16px; border-radius: 50%; border: 3px solid currentColor; border-right-color: transparent; animation: spin 0.7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.glow-btn { animation: nudge 1.4s ease-in-out infinite; }
+.glow-btn { animation: glow-pulse 1.2s ease-in-out infinite; }
+@keyframes glow-pulse { 50% { filter: brightness(1.15); outline: 4px solid rgba(255, 213, 74, 0.9); outline-offset: 2px; } }
 @keyframes nudge { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 
 /* ───────── Surfaces & forms ───────── */

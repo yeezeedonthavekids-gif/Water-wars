@@ -1,0 +1,6 @@
+# Cloudflare Pages configuration (used automatically when you deploy this repo with Cloudflare Pages).
+name = "water-wars"
+pages_build_output_dir = "dist"
+compatibility_date = "2025-09-01"
+# The game server uses node:crypto and process.env.
+compatibility_flags = ["nodejs_compat"]
