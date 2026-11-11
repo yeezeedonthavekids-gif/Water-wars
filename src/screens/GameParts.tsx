@@ -353,6 +353,10 @@ function TargetPicker({
   view, uid, value, onChange, filter,
 }: { view: PublicView; uid: string; value: string | null; onChange: (id: string) => void; filter?: (p: PublicPlayer) => string | null }) {
   const opps = view.players.filter((p) => p.id !== uid && p.status === 'active');
+  const valid = opps.filter((p) => !filter?.(p));
+  useEffect(() => {
+    if (!value && valid.length === 1) onChange(valid[0].id);
+  }, [value, valid.length]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="target-grid">
       {opps.map((p) => {
