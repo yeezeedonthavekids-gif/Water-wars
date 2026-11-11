@@ -169,6 +169,8 @@ export interface PublicView {
   activeProperty: Property | null;
   discardTop: string | null;
   discardCount: number;
+  /** Last few cards played (top card last), for the visual pile. */
+  discardRecent: string[];
   deckCount: number;
   pending: PublicPending | null;
   lastQuestion: QuestionResult | null;

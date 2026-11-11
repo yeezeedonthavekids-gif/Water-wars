@@ -665,3 +665,76 @@ button.card:hover { transform: translateY(-4px) rotate(-1deg); }
   animation: stack-pop 0.5s var(--spring);
 }
 @keyframes stack-pop { from { transform: scale(0.2) rotate(-25deg); } }
+
+/* ───────── Credits (home page) ───────── */
+.credits {
+  display: grid; justify-items: center; gap: 2px;
+  background: var(--gold); color: #3d2a00; border: 4px solid #fff;
+  border-radius: 18px; padding: 8px 22px 10px; box-shadow: 0 6px 0 var(--gold-dark), 0 10px 22px rgba(13, 40, 80, 0.25);
+  transform: rotate(-2deg); animation: credits-in 0.7s var(--spring) 0.2s backwards, credits-wobble 4s ease-in-out 1s infinite;
+}
+.credits-label { font-weight: 900; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.18em; }
+.credits-names { font-family: var(--font-display); font-size: clamp(1.35rem, 6vw, 1.9rem); line-height: 1.1; text-align: center; color: #2a1c00; }
+@keyframes credits-in { from { transform: rotate(-12deg) scale(0.3); opacity: 0; } }
+@keyframes credits-wobble { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(1.5deg) scale(1.03); } }
+
+/* ───────── Visual piles ───────── */
+.deck-stack { position: relative; }
+.deck-layer {
+  position: absolute; inset: 0; border-radius: 1em; font-size: calc(clamp(80px, 12vh, 132px) * 0.1);
+  background: #0d469a; border: 0.16em solid rgba(255, 255, 255, 0.55);
+}
+.deck-layer.l1 { transform: translate(4px, 4px) rotate(2deg); }
+.deck-layer.l2 { transform: translate(8px, 8px) rotate(4deg); opacity: 0.85; }
+.deck-layer.l3 { transform: translate(12px, 12px) rotate(6deg); opacity: 0.7; }
+.deck-stack .deck-card { position: relative; }
+.discard { isolation: isolate; }
+.discard-under { position: absolute; top: 0; left: 0; z-index: 0; pointer-events: none; filter: brightness(0.92); }
+.discard-wrap { z-index: 1; transform: rotate(var(--tilt, 0deg)); }
+@keyframes play-from-me { from { transform: translateY(170px) scale(0.5) rotate(25deg); opacity: 0; } 60% { transform: translateY(-10px) scale(1.12) rotate(var(--tilt, 0deg)); opacity: 1; } }
+@keyframes play-from-opp { from { transform: translateY(-170px) scale(0.5) rotate(-25deg); opacity: 0; } 60% { transform: translateY(8px) scale(1.12) rotate(var(--tilt, 0deg)); opacity: 1; } }
+.ripple { position: absolute; left: 50%; top: 50%; width: 60%; aspect-ratio: 1; border-radius: 50%; border: 5px solid rgba(255, 255, 255, 0.9); transform: translate(-50%, -50%) scale(0.2); opacity: 0; pointer-events: none; animation: ripple 0.8s ease-out 0.2s; }
+.ripple.r2 { animation-delay: 0.35s; border-width: 3px; }
+@keyframes ripple { 0% { transform: translate(-50%, -50%) scale(0.3); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; } }
+
+/* ───────── Callouts & shake ───────── */
+.callout { position: fixed; left: 50%; top: 40%; z-index: 45; pointer-events: none; transform: translate(-50%, -50%); }
+.callout-text {
+  display: block; font-family: var(--font-display); font-size: clamp(2.8rem, 13vw, 5.5rem); white-space: nowrap;
+  color: #fff; -webkit-text-stroke: 3px var(--c-dark, #b8233f); text-shadow: 0 7px 0 var(--c-dark, #b8233f), 0 12px 30px rgba(0, 0, 0, 0.35);
+  animation: callout 1.25s var(--spring) forwards;
+}
+.tone-red { --c: #ef4060; --c-dark: #b8233f; }
+.tone-gold { --c: #ffc21a; --c-dark: #c27a00; }
+.tone-purple { --c: #9b59f0; --c-dark: #6a2fc0; }
+.tone-blue { --c: #2f86f6; --c-dark: #1559c2; }
+.tone-green { --c: #22c55e; --c-dark: #15944a; }
+@keyframes callout {
+  0% { transform: scale(0.2) rotate(-14deg); opacity: 0; }
+  18% { transform: scale(1.18) rotate(4deg); opacity: 1; }
+  30% { transform: scale(0.96) rotate(-2deg); }
+  42% { transform: scale(1.03) rotate(0deg); }
+  80% { transform: scale(1) translateY(0); opacity: 1; }
+  100% { transform: scale(1.05) translateY(-40px); opacity: 0; }
+}
+.callout-drop {
+  position: absolute; left: 50%; top: 50%; width: 16px; height: 20px; margin: -10px 0 0 -8px;
+  background: var(--c, #2f86f6); border: 3px solid #fff; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  transform: rotate(var(--a)) translateY(0) scale(0.3); opacity: 0; animation: drop-burst 0.9s ease-out 0.1s forwards;
+}
+@keyframes drop-burst {
+  0% { transform: rotate(var(--a)) translateY(0) scale(0.3); opacity: 1; }
+  100% { transform: rotate(var(--a)) translateY(-170px) scale(1); opacity: 0; }
+}
+.shake-screen { animation: screen-shake 0.45s; }
+@keyframes screen-shake {
+  15% { transform: translate(-9px, 4px) rotate(-0.6deg); }
+  30% { transform: translate(8px, -5px) rotate(0.5deg); }
+  45% { transform: translate(-6px, 3px); }
+  60% { transform: translate(5px, -2px); }
+  80% { transform: translate(-2px, 1px); }
+}
+
+/* Extra life in the hand */
+.hand-slot .card.is-glow:hover { transform: translateY(-10px) rotate(-3deg) scale(1.05); }
+.opp.is-turn .avatar { animation: bob 1.2s ease-in-out infinite; }

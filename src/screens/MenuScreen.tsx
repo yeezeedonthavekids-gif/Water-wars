@@ -73,6 +73,10 @@ export function MenuScreen({ navigate, joinCode }: { navigate: (r: Route) => voi
           <CardView id="adh-window" size="md" className="hero-card hc3" />
         </div>
         <Logo />
+        <div className="credits" aria-label="Made by Matias P, Reid W and Jackson L">
+          <span className="credits-label">Made by</span>
+          <span className="credits-names">Matias P · Reid W · Jackson L</span>
+        </div>
         <p className="tagline">The multiplayer science card game of <b className="t-coh">Cohesion</b>, <b className="t-adh">Adhesion</b> &amp; <b className="t-sur">Surface Tension</b></p>
       </div>
 

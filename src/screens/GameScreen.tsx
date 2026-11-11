@@ -23,6 +23,13 @@ type Dialog =
 
 const QUIET_ERRORS = new Set(['NOT_EXPIRED']);
 
+/** Stable pseudo-random tilt per card so the pile looks naturally messy. */
+function tilt(id: string, range = 10) {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return ((Math.abs(h) % (range * 20)) / 10 - range);
+}
+
 export function GameScreen({ room, view, onLeave }: { room: RoomState; view: PublicView; onLeave: () => void }) {
   const toast = useToast();
   const settings = useSettings();
@@ -85,13 +92,71 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
     }
   }, [view.turn, uid]);
 
+  // ── Big pop-up callouts (SKIP!, +4!, CAUGHT!…) and screen shake ──
+  const [callout, setCallout] = useState<{ text: string; tone: string; k: number } | null>(null);
+  const [shake, setShake] = useState(0);
+  const pop = useCallback((text: string, tone: string, rumble = false) => {
+    setCallout({ text, tone, k: Date.now() + Math.random() });
+    if (rumble) setShake(Date.now());
+  }, []);
+  useEffect(() => {
+    if (!callout) return;
+    const t = setTimeout(() => setCallout(null), 1300);
+    return () => clearTimeout(t);
+  }, [callout]);
+  useEffect(() => {
+    if (!shake) return;
+    const t = setTimeout(() => setShake(0), 500);
+    return () => clearTimeout(t);
+  }, [shake]);
+
   const prevTop = useRef(view.discardTop);
   useEffect(() => {
     if (view.discardTop !== prevTop.current) {
       prevTop.current = view.discardTop;
       sfx('play');
+      if (!view.discardTop || battle) return;
+      const fx = defOf(view.discardTop).effect;
+      const map: Record<string, [string, string, boolean?]> = {
+        soap: ['SKIP!', 'red'],
+        evaporation: ['REVERSE!', 'gold'],
+        capillary: ['+2!', 'red'],
+        rain: ['+2!', 'red'],
+        storm: ['+4!', 'red', true],
+        whirlpool: ['SWAP!', 'purple', true],
+        current: ['PASS IT ON!', 'blue', true],
+        hbond: ['AGAIN!', 'green'],
+        splash: ['SPLASH ATTACK!', 'blue'],
+        grab: ['GOTCHA!', 'purple'],
+      };
+      const hit = fx ? map[fx] : undefined;
+      if (hit) pop(hit[0], hit[1], !!hit[2]);
+      else if (defOf(view.discardTop).category === 'challenge') pop('CHALLENGE!', 'gold');
     }
-  }, [view.discardTop]);
+  }, [view.discardTop, battle, pop]);
+
+  // Callouts from game events in the log.
+  const lastSeq = useRef(view.log.length ? view.log[view.log.length - 1].seq : 0);
+  useEffect(() => {
+    const fresh = view.log.filter((e) => e.seq > lastSeq.current);
+    if (!fresh.length) return;
+    lastSeq.current = fresh[fresh.length - 1].seq;
+    for (const e of fresh) {
+      const took = e.text.match(/draws (\d+) cards!/);
+      if (e.text.includes('Caught by')) {
+        pop('CAUGHT! +2', 'red', true);
+        sfx('wrong');
+      } else if (e.text.includes('called SPLASH')) {
+        pop('SPLASH!', 'blue');
+      } else if (took && e.text.includes('😱')) {
+        pop(`+${took[1]} 😱`, 'red', Number(took[1]) >= 4);
+      } else if (e.text.includes('blocked all')) {
+        pop('BLOCKED!', 'green');
+      } else if (e.text.includes('💥')) {
+        pop('KO!', 'red', true);
+      }
+    }
+  }, [view.log, pop]);
 
   // Hand: animate newly received cards.
   const known = useRef<Set<string>>(new Set());
@@ -180,7 +245,7 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
   const selDef = selected ? defOf(selected) : null;
 
   return (
-    <div className={`game ${battle ? 'mode-battle' : 'mode-classic'} ${myTurn ? 'my-turn' : ''}`}>
+    <div className={`game ${battle ? 'mode-battle' : 'mode-classic'} ${myTurn ? 'my-turn' : ''} ${shake ? 'shake-screen' : ''}`}>
       <header className="game-top">
         <button className="icon-btn" onClick={() => setDialog({ kind: 'leave' })} aria-label="Leave game">
           <Icon name="logout" />
@@ -226,14 +291,26 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
 
         <div className="piles">
           <div className="pile">
-            <CardBack size="md" count={view.deckCount} className="deck-card" />
+            <div className="deck-stack">
+              {view.deckCount > 30 && <div className="deck-layer l3" />}
+              {view.deckCount > 12 && <div className="deck-layer l2" />}
+              {view.deckCount > 1 && <div className="deck-layer l1" />}
+              {view.deckCount > 0 ? <CardBack size="md" count={view.deckCount} className="deck-card" /> : <div className="card card-md card-empty">Empty</div>}
+            </div>
             <span className="pile-label">Deck</span>
           </div>
           <div className={`pile discard ${activeColor}`}>
             {!battle && view.drawStack > 0 && <div key={`stack-${view.drawStack}`} className="stack-badge">+{view.drawStack}</div>}
+            {view.discardRecent.slice(0, -1).map((c, i, arr) => (
+              <div key={c} className="discard-under" style={{ transform: `rotate(${tilt(c)}deg) translate(${tilt(c, 7)}px, ${(arr.length - i) * 2}px)` }}>
+                <CardView id={c} size="md" mode={mode} />
+              </div>
+            ))}
             {top ? (
-              <div key={top} className={`discard-wrap ${lastActorIsMe ? 'from-me' : 'from-opp'}`}>
+              <div key={top} className={`discard-wrap ${lastActorIsMe ? 'from-me' : 'from-opp'}`} style={{ ['--tilt' as string]: `${tilt(top)}deg` }}>
                 <CardView id={top} size="md" mode={mode} onClick={() => setDialog({ kind: 'detail', cardId: top })} />
+                <span className="ripple" />
+                <span className="ripple r2" />
               </div>
             ) : (
               <div className="card card-md card-empty">Discard</div>
@@ -365,6 +442,14 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
       </section>
 
       {banner && <div className="your-turn-banner">{banner}</div>}
+      {callout && (
+        <div key={callout.k} className={`callout tone-${callout.tone}`} aria-live="polite">
+          <span className="callout-text">{callout.text}</span>
+          {Array.from({ length: 10 }, (_, i) => (
+            <span key={i} className="callout-drop" style={{ ['--a' as string]: `${i * 36}deg` }} />
+          ))}
+        </div>
+      )}
 
       {pending?.kind === 'question' && (
         <QuestionModal pending={pending} view={view} uid={uid} busy={busy} onAnswer={(i) => send({ type: 'answer', choice: i })} />

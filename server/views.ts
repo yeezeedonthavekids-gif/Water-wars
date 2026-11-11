@@ -43,6 +43,7 @@ export function publicView(s: GameState): PublicView {
     activeProperty: s.activeProperty,
     discardTop: s.discard.length ? s.discard[s.discard.length - 1] : null,
     discardCount: s.discard.length,
+    discardRecent: s.discard.slice(-5),
     deckCount: s.deck.length,
     pending,
     lastQuestion: s.lastQuestion,
