@@ -237,7 +237,7 @@ export const CARDS: CardDef[] = [
     id: 'act-capillary', name: 'Capillary Pull', category: 'action', properties: ['adhesion'], effect: 'capillary',
     description: 'Water climbs up into narrow spaces.',
     science: 'In narrow spaces, adhesion pulls water up the walls and cohesion drags more water along behind it.',
-    classic: 'The next player draws 2 cards.',
+    classic: 'The next player draws 2 cards, unless they stack another draw card!',
     battle: 'You draw 2 cards.',
     points: 1, power: 0, art: 'tube', copies: 1,
   },
@@ -256,6 +256,32 @@ export const CARDS: CardDef[] = [
     classic: 'Every other player draws 1 card.',
     battle: 'Deal 2 damage to every opponent.',
     points: 1, power: 2, art: 'splash', copies: 1,
+  },
+
+  // ───────── Twist cards (wild actions) ─────────
+  {
+    id: 'act-storm', name: 'Storm Surge', category: 'action', properties: ['cohesion'], wild: true, effect: 'storm',
+    description: 'A massive wave rolls in and swamps the next player.',
+    science: 'Cohesion keeps water molecules linked together, so a wave moves as one connected mass with huge force.',
+    classic: 'Wild. Choose the color. The next player draws 4, unless they stack another draw card!',
+    battle: 'Deal 4 damage to a target.',
+    points: 0, power: 4, target: { battle: true }, art: 'wave', copies: 2,
+  },
+  {
+    id: 'act-whirlpool', name: 'Whirlpool', category: 'action', properties: ['cohesion'], wild: true, effect: 'whirlpool',
+    description: 'Everything gets sucked in and spun around.',
+    science: 'In a whirlpool, cohesion keeps the spinning water together, so floating things get pulled toward the center.',
+    classic: 'Wild. Swap your whole hand with any player.',
+    battle: 'Swap your whole hand with any player.',
+    points: 0, power: 0, target: { classic: true, battle: true }, art: 'whirlpool', copies: 1,
+  },
+  {
+    id: 'act-current', name: 'Ocean Current', category: 'action', properties: ['cohesion'], wild: true, effect: 'current',
+    description: 'The current carries everyone\'s cards downstream.',
+    science: 'Cohesion keeps water flowing as one connected current, carrying everything in it along with the flow.',
+    classic: 'Wild. Everyone passes their whole hand to the next player.',
+    battle: 'Everyone passes their whole hand to the next player.',
+    points: 0, power: 0, art: 'current', copies: 1,
   },
 
   // ───────── Real-World Examples ─────────
@@ -313,7 +339,7 @@ export const CARDS: CardDef[] = [
     id: 'pow-rain', name: 'Rain Refill', category: 'powerup', properties: ['cohesion'], wild: true, effect: 'rain',
     description: 'Fresh rain fills your drop back up.',
     science: 'Raindrops form as cohesion pulls tiny cloud droplets together into drops heavy enough to fall.',
-    classic: 'Wild. The next player draws 2 cards.',
+    classic: 'Wild. The next player draws 2 cards (stackable).',
     battle: 'Free action. Heal 5.',
     points: 0, power: 0, art: 'cloud', copies: 1,
   },
@@ -349,6 +375,11 @@ export const isPropertyCard = (c: CardDef) =>
 export function needsTarget(c: CardDef, mode: Mode): boolean {
   if (mode === 'battle' && isPropertyCard(c)) return true;
   return !!c.target?.[mode];
+}
+
+/** Classic: draw cards that can be stacked on a pending draw (+2 / +4). */
+export function isStackable(c: CardDef): boolean {
+  return c.effect === 'capillary' || c.effect === 'rain' || c.effect === 'storm' || c.effect === 'waterPower';
 }
 
 /** Classic: can this card be played on the current pile? */

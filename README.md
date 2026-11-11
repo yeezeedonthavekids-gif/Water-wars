@@ -73,7 +73,7 @@ All configuration lives in Netlify's environment variables. The browser fetches 
 
 ## How to play
 
-Every card is linked to cohesion, adhesion or surface tension. There are **42 unique cards** (79 in the deck) in seven categories: Cohesion, Adhesion, Surface Tension, Challenge, Action, Real-World and Power-Up. The bank holds **40 science questions** plus 6 real-world classification cards, including combination questions such as *"Water rises in a narrow tube. Explain cohesion AND adhesion."* The full rules and a browsable card library with explanations are in the app under **How to Play**.
+Every card is linked to cohesion, adhesion or surface tension. There are **45 unique cards** (83 in the deck) in seven categories: Cohesion, Adhesion, Surface Tension, Challenge, Action, Real-World and Power-Up. The bank holds **40 science questions** plus 6 real-world classification cards, including combination questions such as *"Water rises in a narrow tube. Explain cohesion AND adhesion."* The full rules and a browsable card library with explanations are in the app under **How to Play**.
 
 ### Classic mode (UNO-style): first to empty their hand wins
 * Everyone starts with 7 cards. The color under the middle pile is the **active property** (blue = Cohesion, purple = Adhesion, gold = Surface Tension).
@@ -81,6 +81,9 @@ Every card is linked to cohesion, adhesion or surface tension. There are **42 un
 * Nothing matches? **Draw a card**, then play it if it matches or end your turn.
 * **Action cards:** Soap Disruptor skips the next player, Evaporation reverses the order, Capillary Pull makes the next player draw 2, Surfactant Splash makes everyone else draw 1, and more.
 * **Science:** Challenge cards quiz an opponent (wrong answer = they draw 2). Real-World cards ask you to name the property an example shows (wrong = you draw 1). Science Star gives a bonus question (right = take another turn).
+* **💦 Call SPLASH!** on your last card. Forget, and anyone can hit **CATCH!** to make you draw 2.
+* **Stacking:** +2 and +4 cards stack. The victim can pass the growing pile on with their own draw card, or take it all (a Shield blocks the whole pile).
+* **Twist cards:** Storm Surge (wild +4), Whirlpool (swap your whole hand with any player), Ocean Current (everyone passes their hand along).
 * **Win** by playing your last card. If nobody has after 20 rounds, the fewest cards wins.
 
 ### Battle mode, with the last drop standing winning

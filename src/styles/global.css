@@ -637,3 +637,31 @@ button.card:hover { transform: translateY(-4px) rotate(-1deg); }
   transition-duration: 0.01ms !important;
 }
 [data-reduce-motion] .confetti { display: none; }
+
+/* ───────── SPLASH! / CATCH! / draw stack ───────── */
+.splash-btn {
+  border: 0; border-radius: 14px; padding: 9px 16px; margin-bottom: 5px;
+  font-family: var(--font-display); font-size: 1.35rem; letter-spacing: 0.04em; color: #fff;
+  background: linear-gradient(180deg, #3fb4ff, #1477e6); box-shadow: 0 5px 0 #0d4fa3;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.2); animation: splash-pulse 0.9s ease-in-out infinite;
+}
+.splash-btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #0d4fa3; }
+@keyframes splash-pulse { 50% { transform: scale(1.1) rotate(-3deg); } }
+.splash-tag { font-size: 0.7rem; font-weight: 900; color: #fff; background: #1f8ff0; padding: 1px 7px; border-radius: 6px; white-space: nowrap; }
+.splash-tag.big { font-size: 0.9rem; padding: 5px 10px; border-radius: 10px; }
+.opp.is-catchable { border-color: var(--danger); animation: shake 0.6s ease-in-out infinite; }
+.catch-btn {
+  position: absolute; right: -6px; bottom: -10px; z-index: 4;
+  border: 3px solid #fff; border-radius: 12px; padding: 5px 11px;
+  font-family: var(--font-display); font-size: 1rem; letter-spacing: 0.04em; color: #fff;
+  background: var(--danger); box-shadow: 0 4px 0 var(--danger-dark); animation: splash-pulse 0.6s ease-in-out infinite;
+}
+.catch-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--danger-dark); }
+.opponents { padding-bottom: 14px; }
+.stack-badge {
+  position: absolute; top: -14px; right: -18px; z-index: 3;
+  font-family: var(--font-display); font-size: 1.7rem; color: #fff; background: var(--danger);
+  border: 3px solid #fff; border-radius: 16px; padding: 2px 12px; box-shadow: 0 4px 0 var(--danger-dark);
+  animation: stack-pop 0.5s var(--spring);
+}
+@keyframes stack-pop { from { transform: scale(0.2) rotate(-25deg); } }

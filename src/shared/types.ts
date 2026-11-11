@@ -8,7 +8,8 @@ export type Phase = 'lobby' | 'playing' | 'finished';
 
 export type EffectId =
   | 'soap' | 'evaporation' | 'swap' | 'capillary' | 'grab' | 'splash'
-  | 'waterPower' | 'wildBond' | 'hbond' | 'shield' | 'rain' | 'star';
+  | 'waterPower' | 'wildBond' | 'hbond' | 'shield' | 'rain' | 'star'
+  | 'storm' | 'whirlpool' | 'current';
 
 export type PlayerStatus = 'active' | 'left' | 'out';
 
@@ -34,6 +35,8 @@ export interface PublicPlayer {
   handCount: number;
   stats: PlayerStats;
   placement?: number;
+  /** Classic: called SPLASH! (safe from being caught on their last card). */
+  called: boolean;
 }
 
 export type WaterPowerChoice = 'draw' | 'points' | 'shield';
@@ -63,7 +66,11 @@ export type GameAction =
   | { type: 'answer'; choice: number }
   | { type: 'endTurn' }
   | { type: 'rest' }
-  | { type: 'timeout' };
+  | { type: 'timeout' }
+  /** Classic: call SPLASH! when down to your last card(s). */
+  | { type: 'splash' }
+  /** Classic: catch a player who forgot to call SPLASH! (they draw 2). */
+  | { type: 'catch'; targetId: string };
 
 export interface LogEntry {
   seq: number;
@@ -156,6 +163,8 @@ export interface PublicView {
   maxRounds: number;
   /** Battle: starting/maximum HP this game. */
   maxHp: number;
+  /** Classic: cards the current player must draw unless they stack another draw card. */
+  drawStack: number;
   turn: PublicTurn | null;
   activeProperty: Property | null;
   discardTop: string | null;

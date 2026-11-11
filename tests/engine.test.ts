@@ -83,6 +83,19 @@ function step(s: GameState, ctx: Ctx, rng: () => number) {
     applyGameAction(s, ctx, to, card && rng() < 0.7 ? { type: 'tradeRespond', accept: true, cardId: card } : { type: 'tradeRespond', accept: false });
     return;
   }
+  // Random SPLASH! calls and catches from anyone.
+  if (s.mode === 'classic' && rng() < 0.15) {
+    const p = s.players[Math.floor(rng() * s.players.length)];
+    const t = s.players[Math.floor(rng() * s.players.length)];
+    const snapshot = JSON.stringify(s);
+    try {
+      applyGameAction(s, ctx, p.id, rng() < 0.5 ? { type: 'splash' } : { type: 'catch', targetId: t.id });
+    } catch (e) {
+      if (!(e instanceof GameError)) throw e;
+      expect(JSON.stringify(s)).toBe(snapshot);
+    }
+    if (s.phase !== 'playing') return;
+  }
   const cur = s.players[s.turn!.idx];
   // Occasionally let the turn time out.
   if (rng() < 0.03) {
@@ -217,6 +230,60 @@ describe('rules enforcement', () => {
     s.hands[cur].push(card);
     applyGameAction(s, ctx, cur, { type: 'play', cardId: card });
     expect(s.players[s.turn!.idx].id).toBe(cur);
+  });
+
+  it('SPLASH!: forget to call on your last card and you can be caught for +2', () => {
+    const { s, ctx } = setup(3, 'classic', seeded(21));
+    const [a, b] = s.players.map((p) => p.id);
+    s.deck.push(...s.hands[a].splice(1)); // a now holds 1 card, has not called
+    expect(() => applyGameAction(s, ctx, a, { type: 'catch', targetId: a })).toThrow();
+    applyGameAction(s, ctx, b, { type: 'catch', targetId: a });
+    expect(s.hands[a].length).toBe(3);
+    expect(() => applyGameAction(s, ctx, b, { type: 'catch', targetId: a })).toThrow(/safe/); // now has 3 cards
+    s.deck.push(...s.hands[a].splice(1));
+    applyGameAction(s, ctx, a, { type: 'splash' });
+    expect(() => applyGameAction(s, ctx, b, { type: 'catch', targetId: a })).toThrow(/safe/);
+    expect(() => applyGameAction(s, ctx, b, { type: 'splash' })).toThrow(/2 cards or fewer/);
+  });
+
+  it('draw cards stack until someone takes the whole pile', () => {
+    const { s, ctx } = setup(3, 'classic', seeded(22));
+    const give = (pid: string, card: string) => {
+      for (const k of Object.keys(s.hands)) s.hands[k] = s.hands[k].filter((c) => c !== card);
+      s.deck = s.deck.filter((c) => c !== card);
+      s.discard = s.discard.filter((c) => c !== card);
+      s.hands[pid].push(card);
+    };
+    const p1 = s.players[s.turn!.idx].id;
+    give(p1, 'act-storm~1');
+    applyGameAction(s, ctx, p1, { type: 'play', cardId: 'act-storm~1', property: 'surface' });
+    expect(s.drawStack).toBe(4);
+    const p2 = s.players[s.turn!.idx].id;
+    expect(p2).not.toBe(p1);
+    const plain = s.hands[p2].find((c) => !['capillary', 'rain', 'storm', 'waterPower'].includes(defOf(c).effect ?? ''));
+    if (plain) expect(() => applyGameAction(s, ctx, p2, { type: 'play', cardId: plain })).toThrow(/stack/i);
+    give(p2, 'pow-rain~1');
+    applyGameAction(s, ctx, p2, { type: 'play', cardId: 'pow-rain~1' });
+    expect(s.drawStack).toBe(6);
+    const p3 = s.players[s.turn!.idx].id;
+    const before = s.hands[p3].length;
+    applyGameAction(s, ctx, p3, { type: 'draw' });
+    expect(s.hands[p3].length).toBe(before + 6);
+    expect(s.drawStack).toBe(0);
+    expect(s.players[s.turn!.idx].id).not.toBe(p3);
+  });
+
+  it('Whirlpool swaps whole hands, Ocean Current rotates them', () => {
+    const { s, ctx } = setup(3, 'classic', seeded(23));
+    const p1 = s.players[s.turn!.idx].id;
+    const other = s.players.find((p) => p.id !== p1)!.id;
+    for (const k of Object.keys(s.hands)) s.hands[k] = s.hands[k].filter((c) => c !== 'act-whirlpool~1');
+    s.deck = s.deck.filter((c) => c !== 'act-whirlpool~1');
+    s.hands[p1].push('act-whirlpool~1');
+    const theirs = [...s.hands[other]];
+    applyGameAction(s, ctx, p1, { type: 'play', cardId: 'act-whirlpool~1', targetId: other });
+    expect(s.hands[p1]).toEqual(theirs);
+    expect(cardCount(s)).toBe(TOTAL);
   });
 
   it('the public view never includes hands or the deck order', () => {

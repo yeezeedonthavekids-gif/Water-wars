@@ -76,12 +76,14 @@ export function HpBar({ hp, shield, max = BATTLE_HP }: { hp: number; shield: num
 }
 
 export function OpponentChip({
-  p, view, room, onClick,
-}: { p: PublicPlayer; view: PublicView; room: RoomState; onClick?: () => void }) {
+  p, view, room, onCatch,
+}: { p: PublicPlayer; view: PublicView; room: RoomState; onCatch?: () => void }) {
   const battle = view.mode === 'battle';
   const isTurn = view.turn?.playerId === p.id;
   const answering = view.pending?.kind === 'question' && view.pending.responderId === p.id;
   const trading = view.pending?.kind === 'trade' && view.pending.toId === p.id;
+  // Classic: down to one card without calling SPLASH! = anyone can catch them.
+  const catchable = !battle && p.status === 'active' && p.handCount === 1 && !p.called;
   const online = isOnline(room, p.id);
   const cardDelta = useDelta(p.handCount);
   const hpDelta = useDelta(p.hp);
@@ -99,10 +101,8 @@ export function OpponentChip({
   }, [p.hp]);
 
   return (
-    <button
-      type="button"
-      className={`opp ${isTurn ? 'is-turn' : ''} ${p.status !== 'active' ? `is-${p.status}` : ''} ${hit ? 'is-hit' : ''}`}
-      onClick={onClick}
+    <div
+      className={`opp ${isTurn ? 'is-turn' : ''} ${p.status !== 'active' ? `is-${p.status}` : ''} ${hit ? 'is-hit' : ''} ${catchable ? 'is-catchable' : ''}`}
       data-player={p.id}
     >
       <div className="avatar-wrap">
@@ -120,6 +120,7 @@ export function OpponentChip({
         ) : (
           <div className="opp-score">
             <b>{p.handCount}</b> {p.handCount === 1 ? 'card left!' : 'cards'}
+            {p.called && p.handCount <= 2 && <span className="splash-tag">💦 SPLASH!</span>}
             {p.shield > 0 && <Icon name="shield" size={12} className="shield-ico" />}
           </div>
         )}
@@ -146,7 +147,12 @@ export function OpponentChip({
           {hpDelta.v > 0 ? `+${hpDelta.v}` : hpDelta.v}
         </span>
       )}
-    </button>
+      {catchable && onCatch && (
+        <button type="button" className="catch-btn" onClick={onCatch}>
+          CATCH!
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -378,7 +384,8 @@ export function PlayDialog({
   const wantTarget = needsTarget(def, mode);
   const isAttack = battle && isPropertyCard(def);
   const wantGive = def.effect === 'swap' || (!battle && def.effect === 'grab');
-  const wantProp = !battle && def.effect === 'wildBond';
+  const wantProp = !battle && (def.effect === 'wildBond' || def.effect === 'storm');
+  const stacking = !battle && view.drawStack > 0;
   const wantChoice = def.effect === 'waterPower';
   const targetFilter = (p: PublicPlayer) => {
     if ((battle && def.effect === 'grab') || def.effect === 'swap') return p.handCount < 1 ? 'no cards' : null;
@@ -458,7 +465,7 @@ export function PlayDialog({
             <section>
               <h3>Choose your Water Power</h3>
               <div className="style-grid">
-                {(['draw', 'points', 'shield'] as WaterPowerChoice[]).map((c) => (
+                {((stacking ? ['draw'] : ['draw', 'points', 'shield']) as WaterPowerChoice[]).map((c) => (
                   <button key={c} type="button" className={`style-btn ${choice === c ? 'on' : ''}`} onClick={() => setChoice(c)}>
                     <b>{choiceLabels[c][0]}</b>
                     <span>{choiceLabels[c][1]}</span>

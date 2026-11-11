@@ -3,7 +3,7 @@ import { act, ApiError, serverNow } from '../client/api';
 import { useSettings } from '../client/settings';
 import { sfx } from '../client/sound';
 import type { RoomState } from '../client/useRoom';
-import { classicPlayable, defOf, isPropertyCard, needsTarget, PROPERTY_LABEL } from '../shared/cards';
+import { classicPlayable, defOf, isPropertyCard, isStackable, needsTarget, PROPERTY_LABEL } from '../shared/cards';
 import type { GameAction, PublicView } from '../shared/types';
 import { Icon } from '../components/Icons';
 import { Avatar, CardBack, CardDetail, CardView, Modal, useToast } from '../components/ui';
@@ -145,6 +145,7 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
     if (!canAct) return false;
     const d = defOf(c);
     if (battle) return !(d.category === 'powerup' && view.turn?.powerDone);
+    if (view.drawStack > 0) return isStackable(d);
     return classicPlayable(d, view.activeProperty, top);
   };
 
@@ -156,7 +157,7 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
   const playSelected = async () => {
     if (!selected) return;
     const d = defOf(selected);
-    const needsDialog = needsTarget(d, mode) || d.effect === 'swap' || (!battle && d.effect === 'grab') || d.effect === 'waterPower' || (!battle && d.effect === 'wildBond') || (battle && isPropertyCard(d));
+    const needsDialog = needsTarget(d, mode) || d.effect === 'swap' || (!battle && (d.effect === 'grab' || d.effect === 'storm')) || d.effect === 'waterPower' || (!battle && d.effect === 'wildBond') || (battle && isPropertyCard(d));
     if (needsDialog) return setDialog({ kind: 'play', cardId: selected });
     if (await send({ type: 'play', cardId: selected })) setSelected(null);
   };
@@ -172,6 +173,7 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
   else if (!myTurn) hint = current ? `Waiting for ${current.name}…` : '';
   else if (pending) hint = '';
   else if (battle) hint = view.turn?.powerDone ? 'Play one card, or Rest.' : 'Use a Power-Up (free), then play one card or Rest.';
+  else if (!battle && view.drawStack > 0) hint = anyPlayable ? `Stack a draw card to pass it on, or take ${view.drawStack} cards!` : `No draw card to stack. Take ${view.drawStack} cards!`;
   else if (stage === 'afterDraw') hint = anyPlayable ? 'You can play a glowing card now, or end your turn.' : 'Still no match. Tap End turn.';
   else hint = anyPlayable ? 'Tap a glowing card, then tap Play.' : 'No card matches. Tap Draw.';
 
@@ -200,7 +202,13 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
 
       <section className="opponents" aria-label="Opponents">
         {opponents.map((p) => (
-          <OpponentChip key={p.id} p={p} view={view} room={room} />
+          <OpponentChip
+            key={p.id}
+            p={p}
+            view={view}
+            room={room}
+            onCatch={me.status === 'active' ? () => void send({ type: 'catch', targetId: p.id }).then((ok) => ok && sfx('hit')) : undefined}
+          />
         ))}
       </section>
 
@@ -222,6 +230,7 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
             <span className="pile-label">Deck</span>
           </div>
           <div className={`pile discard ${activeColor}`}>
+            {!battle && view.drawStack > 0 && <div key={`stack-${view.drawStack}`} className="stack-badge">+{view.drawStack}</div>}
             {top ? (
               <div key={top} className={`discard-wrap ${lastActorIsMe ? 'from-me' : 'from-opp'}`}>
                 <CardView id={top} size="md" mode={mode} onClick={() => setDialog({ kind: 'detail', cardId: top })} />
@@ -281,6 +290,15 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
             )}
           </div>
           {me.boost && <span className="chip chip-sm boost-chip"><Icon name="bolt" size={12} /> Boost</span>}
+          {!battle && me.status === 'active' && hand.length <= 2 && hand.length > 0 && (
+            me.called ? (
+              <span className="splash-tag big">💦 Called!</span>
+            ) : (
+              <button className="splash-btn" onClick={() => void send({ type: 'splash' }).then((ok) => ok && sfx('correct'))}>
+                SPLASH!
+              </button>
+            )
+          )}
           {myScoreDelta && myScoreDelta.v !== 0 && (
             <span key={myScoreDelta.k} className={`float-delta ${myScoreDelta.v > 0 ? (battle ? 'heal' : 'up') : 'down'}`}>
               {myScoreDelta.v > 0 ? `+${myScoreDelta.v}` : myScoreDelta.v}
@@ -313,9 +331,15 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
               <Icon name="next" size={16} /> End turn
             </button>
           ) : (
-            <button className={`btn btn-sm ${anyPlayable ? 'btn-secondary' : 'btn-primary glow-btn'}`} disabled={!canAct} onClick={() => send({ type: 'draw' })}>
-              <Icon name="deck" size={16} /> Draw a card
-            </button>
+            view.drawStack > 0 ? (
+              <button className={`btn btn-sm btn-danger ${anyPlayable ? '' : 'glow-btn'}`} disabled={!canAct} onClick={() => send({ type: 'draw' })}>
+                <Icon name="deck" size={16} /> Take {view.drawStack} cards
+              </button>
+            ) : (
+              <button className={`btn btn-sm ${anyPlayable ? 'btn-secondary' : 'btn-primary glow-btn'}`} disabled={!canAct} onClick={() => send({ type: 'draw' })}>
+                <Icon name="deck" size={16} /> Draw a card
+              </button>
+            )
           )
         ) : null}
       </section>

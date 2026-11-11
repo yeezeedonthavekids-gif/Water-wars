@@ -1,7 +1,7 @@
 // Server-authoritative Water Wars game engine.
 // Pure functions that mutate a GameState. No I/O; randomness and time are injected.
 import {
-  buildDeckIds, classicPlayable, defOf, isPropertyCard, needsTarget, PROPERTY_LABEL, type CardDef,
+  buildDeckIds, classicPlayable, defOf, isPropertyCard, isStackable, needsTarget, PROPERTY_LABEL, type CardDef,
 } from '../src/shared/cards';
 import {
   BATTLE_HP, MAX_PLAYERS, MIN_PLAYERS,
@@ -62,6 +62,7 @@ export interface PlayerState {
   stats: PlayerStats;
   placement?: number;
   joinedAt: number;
+  called?: boolean;
 }
 
 type Purpose =
@@ -140,6 +141,8 @@ export interface GameState {
   extraTurn?: boolean;
   /** Battle starting/maximum HP for this game. */
   maxHp?: number;
+  /** Classic: pending draw total that the current player must take or stack. */
+  drawStack?: number;
 }
 
 // ───────────────────────── Helpers ─────────────────────────
@@ -481,10 +484,11 @@ export function startGame(s: GameState, ctx: Ctx, uid: string) {
   s.round = 1;
   s.turnsInRound = 0;
   s.activeProperty = null;
+  s.drawStack = 0;
   shuffle(s.players, ctx.rng);
   s.maxHp = battleHp(s.players.length);
   for (const p of s.players) {
-    Object.assign(p, { status: 'active', score: 0, hp: s.maxHp, shield: 0, boost: false, sets: 0, stats: freshStats() });
+    Object.assign(p, { status: 'active', score: 0, hp: s.maxHp, shield: 0, boost: false, sets: 0, stats: freshStats(), called: false });
     delete p.placement;
     s.hands[p.id] = [];
     drawCards(s, ctx, p.id, s.mode === 'classic' ? CLASSIC_HAND : BATTLE_HAND);
@@ -510,12 +514,12 @@ export function rematch(s: GameState, ctx: Ctx, uid: string) {
   if (s.phase !== 'finished') fail('BAD_PHASE', 'The game is not over yet.');
   s.players = s.players.filter((p) => p.status !== 'left');
   for (const p of s.players) {
-    Object.assign(p, { status: 'active', score: 0, hp: BATTLE_HP, shield: 0, boost: false, sets: 0, stats: freshStats(), ready: p.id === s.hostId });
+    Object.assign(p, { status: 'active', score: 0, hp: BATTLE_HP, shield: 0, boost: false, sets: 0, stats: freshStats(), called: false, ready: p.id === s.hostId });
     delete p.placement;
   }
   Object.assign(s, {
     phase: 'lobby', deck: [], discard: [], hands: {}, turn: null, pending: null, lastQuestion: null,
-    lastAction: null, results: null, winnerIds: [], activeProperty: null, round: 1, turnsInRound: 0, startedAt: null,
+    lastAction: null, results: null, winnerIds: [], activeProperty: null, round: 1, turnsInRound: 0, startedAt: null, drawStack: 0,
   });
   log(s, ctx, 'Rematch! Back to the lobby.', 'system');
 }
@@ -748,6 +752,12 @@ function attackPower(attacker: PlayerState | undefined, base: number): number {
 
 // ───────────────────────── Game actions ─────────────────────────
 export function applyGameAction(s: GameState, ctx: Ctx, uid: string, action: GameAction) {
+  applyGameActionInner(s, ctx, uid, action);
+  // A SPLASH! call only protects you while you're down to your last cards.
+  for (const p of s.players) if ((s.hands[p.id]?.length ?? 0) > 2) p.called = false;
+}
+
+function applyGameActionInner(s: GameState, ctx: Ctx, uid: string, action: GameAction) {
   if (s.phase !== 'playing') fail('BAD_PHASE', 'The game is not running.');
   const me = mustPlayer(s, uid);
   if (!action || typeof action !== 'object') fail('BAD_ACTION', 'Invalid action.');
@@ -770,6 +780,27 @@ export function applyGameAction(s: GameState, ctx: Ctx, uid: string, action: Gam
     const pt = t as PendingTrade;
     if (pt.toId !== uid) fail('NOT_YOU', 'This trade is for someone else.');
     return resolveTrade(s, ctx, !!action.accept, action.cardId);
+  }
+
+  if (action.type === 'splash' || action.type === 'catch') {
+    if (s.mode !== 'classic') fail('BAD_ACTION', 'SPLASH! is only used in Classic mode.');
+    if (me.status !== 'active') fail('NOT_ACTIVE', 'You are out of this game.');
+    if (action.type === 'splash') {
+      if (hand(s, uid).length > 2) fail('TOO_EARLY', 'Call SPLASH! when you are down to 2 cards or fewer.');
+      if (me.called) fail('ALREADY_CALLED', 'You already called SPLASH!');
+      me.called = true;
+      log(s, ctx, `💦 ${me.name} called SPLASH!`, 'good', uid);
+      return;
+    }
+    const t = getPlayer(s, action.targetId);
+    if (!t || t.id === uid || t.status !== 'active' || hand(s, t.id).length !== 1 || t.called) {
+      fail('NOT_CATCHABLE', t && t.id !== uid ? `${t.name} is safe.` : 'Nobody to catch.');
+    }
+    drawCards(s, ctx, t!.id, 2);
+    t!.called = false;
+    log(s, ctx, `🚨 ${t!.name} forgot to call SPLASH! Caught by ${me.name}: +2 cards!`, 'bad', t!.id);
+    setLast(s, ctx, { type: 'draw', actorId: t!.id, amount: 2 });
+    return;
   }
 
   if (me.status !== 'active') fail('NOT_ACTIVE', 'You are out of this game.');
@@ -799,6 +830,7 @@ function handleTimeout(s: GameState, ctx: Ctx) {
   if (ctx.now < s.turn!.deadline && !grace(cur!.id)) fail('NOT_EXPIRED', 'The turn is still running.');
   log(s, ctx, `⏱️ ${cur!.name} ran out of time.`, 'system', cur!.id);
   setLast(s, ctx, { type: 'timeout', actorId: cur!.id });
+  if (s.mode === 'classic' && (s.drawStack ?? 0) > 0) return takeStack(s, ctx, cur!);
   if (s.mode === 'classic' && s.turn!.stage === 'start') drawCards(s, ctx, cur!.id, 1);
   finishTurn(s, ctx);
 }
@@ -838,6 +870,7 @@ function classicAction(s: GameState, ctx: Ctx, me: PlayerState, a: GameAction) {
   const turn = s.turn!;
   switch (a.type) {
     case 'draw': {
+      if ((s.drawStack ?? 0) > 0) return takeStack(s, ctx, me);
       if (turn.stage !== 'start') fail('ALREADY_DREW', 'You already drew this turn.');
       const n = drawCards(s, ctx, me.id, 1);
       turn.stage = 'afterDraw';
@@ -861,7 +894,12 @@ function classicPlay(s: GameState, ctx: Ctx, me: PlayerState, a: Extract<GameAct
   if (!hand(s, me.id).includes(a.cardId)) fail('NOT_IN_HAND', 'That card is not in your hand.');
   const def = defOf(a.cardId);
   const top = s.discard.length ? s.discard[s.discard.length - 1] : null;
-  if (!classicPlayable(def, s.activeProperty, top)) {
+  const stacking = (s.drawStack ?? 0) > 0;
+  if (stacking) {
+    if (!isStackable(def) || (def.effect === 'waterPower' && a.choice !== 'draw')) {
+      fail('MUST_STACK', `Stack a draw card (+2 or +4) or take the ${s.drawStack} cards.`);
+    }
+  } else if (!classicPlayable(def, s.activeProperty, top)) {
     fail('NO_MATCH', `That card doesn't match. Play ${PROPERTY_LABEL[s.activeProperty!]} or a wild card.`);
   }
   // Validate everything before mutating.
@@ -871,7 +909,7 @@ function classicPlay(s: GameState, ctx: Ctx, me: PlayerState, a: Extract<GameAct
     if (!a.giveCardId || a.giveCardId === a.cardId || !hand(s, me.id).includes(a.giveCardId)) fail('NEED_CARD', 'Choose a card to give away.');
   }
   if (def.effect === 'swap' && target && hand(s, target.id).length < 1) fail('BAD_TARGET', `${target.name} has no cards.`);
-  if (def.effect === 'wildBond' && !['cohesion', 'adhesion', 'surface'].includes(a.property as string)) fail('NEED_PROPERTY', 'Choose a property.');
+  if ((def.effect === 'wildBond' || def.effect === 'storm') && !['cohesion', 'adhesion', 'surface'].includes(a.property as string)) fail('NEED_PROPERTY', 'Choose a property.');
   if (def.effect === 'waterPower' && !['draw', 'points', 'shield'].includes(a.choice as string)) fail('NEED_CHOICE', 'Choose a Water Power.');
 
   removeFromHand(s, me.id, a.cardId);
@@ -879,12 +917,10 @@ function classicPlay(s: GameState, ctx: Ctx, me: PlayerState, a: Extract<GameAct
   me.stats.played += 1;
   setLast(s, ctx, { type: 'play', actorId: me.id, cardId: a.cardId, targetId: target?.id });
   const nextId = () => s.players[nextIdx(s, s.turn!.idx, 1)].id;
-  const nextDraws = (n: number, what: string) => {
-    const nid = nextId();
-    if (!classicShieldBlocks(s, ctx, nid, what)) {
-      drawCards(s, ctx, nid, n);
-      log(s, ctx, `${nameOf(s, nid)} draws ${n} card${n === 1 ? '' : 's'}.`, 'play', nid);
-    }
+  // Draw cards don't hit right away: they pile up until someone can't stack.
+  const nextDraws = (n: number) => {
+    s.drawStack = (s.drawStack ?? 0) + n;
+    log(s, ctx, `➕ ${nameOf(s, nextId())} must draw ${s.drawStack}… or stack a draw card!`, 'bad', nextId());
   };
 
   if (isPropertyCard(def)) {
@@ -908,7 +944,9 @@ function classicPlay(s: GameState, ctx: Ctx, me: PlayerState, a: Extract<GameAct
   }
 
   if (def.category === 'action') {
-    s.activeProperty = def.properties[0];
+    if (def.wild) {
+      if (a.property && ['cohesion', 'adhesion', 'surface'].includes(a.property)) s.activeProperty = a.property;
+    } else s.activeProperty = def.properties[0];
     let steps = 1;
     switch (def.effect) {
       case 'soap': {
@@ -928,7 +966,7 @@ function classicPlay(s: GameState, ctx: Ctx, me: PlayerState, a: Extract<GameAct
       }
       case 'capillary':
         log(s, ctx, `🧪 ${me.name} played Capillary Pull.`, 'play', me.id);
-        nextDraws(2, 'Capillary Pull');
+        nextDraws(2);
         break;
       case 'grab': {
         log(s, ctx, `💧 ${me.name} played Droplet Grab on ${target!.name}.`, 'play', me.id);
@@ -944,6 +982,19 @@ function classicPlay(s: GameState, ctx: Ctx, me: PlayerState, a: Extract<GameAct
         if (!classicShieldBlocks(s, ctx, target!.id, 'Property Swap')) doSwap(s, ctx, me.id, target!.id, a.giveCardId!);
         break;
       }
+      case 'storm':
+        log(s, ctx, `🌊 ${me.name} played Storm Surge! The color is now ${PROPERTY_LABEL[s.activeProperty!]}.`, 'play', me.id);
+        nextDraws(4);
+        break;
+      case 'whirlpool':
+        log(s, ctx, `🌀 ${me.name} played Whirlpool on ${target!.name}!`, 'play', me.id);
+        // Played as your last card? You go out instead of handing over an empty hand.
+        if (hand(s, me.id).length && !classicShieldBlocks(s, ctx, target!.id, 'the Whirlpool')) swapHands(s, ctx, me.id, target!.id);
+        break;
+      case 'current':
+        log(s, ctx, `🔄 ${me.name} played Ocean Current! Everyone passes their hand along.`, 'play', me.id);
+        if (hand(s, me.id).length) rotateHands(s, ctx);
+        break;
       case 'splash': {
         log(s, ctx, `🌊 ${me.name} played Surfactant Splash! Everyone else draws 1.`, 'play', me.id);
         for (const p of activePlayers(s)) {
@@ -974,7 +1025,7 @@ function classicPlay(s: GameState, ctx: Ctx, me: PlayerState, a: Extract<GameAct
     case 'waterPower':
       if (a.choice === 'draw') {
         log(s, ctx, `⭐ ${me.name} used Water Power: next player draws 2.`, 'play', me.id);
-        nextDraws(2, 'Water Power');
+        nextDraws(2);
       } else if (a.choice === 'points') {
         const nid = nextId();
         log(s, ctx, `⭐ ${me.name} used Water Power: skip ${nameOf(s, nid)}.`, 'play', me.id);
@@ -998,7 +1049,7 @@ function classicPlay(s: GameState, ctx: Ctx, me: PlayerState, a: Extract<GameAct
       break;
     case 'rain':
       log(s, ctx, `🌧️ ${me.name} played Rain Refill.`, 'play', me.id);
-      nextDraws(2, 'Rain Refill');
+      nextDraws(2);
       break;
     case 'star': {
       log(s, ctx, `🌟 ${me.name} played Science Star. Bonus question!`, 'science', me.id);
@@ -1012,6 +1063,38 @@ function classicPlay(s: GameState, ctx: Ctx, me: PlayerState, a: Extract<GameAct
     }
   }
   return finishTurn(s, ctx, steps);
+}
+
+/** Classic: take the whole pending draw stack (a Shield blocks it all) and end the turn. */
+function takeStack(s: GameState, ctx: Ctx, p: PlayerState) {
+  const n = s.drawStack ?? 0;
+  s.drawStack = 0;
+  if (p.shield > 0) {
+    p.shield = 0;
+    log(s, ctx, `🛡️ ${p.name}'s Shield blocked all ${n} cards!`, 'good', p.id);
+  } else {
+    drawCards(s, ctx, p.id, n);
+    log(s, ctx, `😱 ${p.name} draws ${n} cards!`, 'bad', p.id);
+  }
+  setLast(s, ctx, { type: 'draw', actorId: p.id, amount: n });
+  finishTurn(s, ctx);
+}
+
+function swapHands(s: GameState, ctx: Ctx, a: string, b: string) {
+  [s.hands[a], s.hands[b]] = [hand(s, b), hand(s, a)];
+  log(s, ctx, `${nameOf(s, a)} and ${nameOf(s, b)} swapped their whole hands!`, 'play', a);
+}
+
+/** Every active player passes their hand to the next player in turn order. */
+function rotateHands(s: GameState, ctx: Ctx) {
+  const active = activePlayers(s);
+  if (active.length < 2) return;
+  const ordered = s.turn!.dir === 1 ? active : [...active].reverse();
+  const hands = ordered.map((p) => hand(s, p.id));
+  ordered.forEach((p, i) => {
+    s.hands[p.id] = hands[(i - 1 + ordered.length) % ordered.length];
+  });
+  log(s, ctx, 'Every hand moved to the next player!', 'play');
 }
 
 function doSwap(s: GameState, ctx: Ctx, meId: string, targetId: string, giveCardId: string) {
@@ -1157,6 +1240,19 @@ function battlePlay(s: GameState, ctx: Ctx, me: PlayerState, a: Extract<GameActi
       case 'swap':
         log(s, ctx, `🔄 ${me.name} played Property Swap with ${target!.name}.`, 'play', me.id);
         doSwap(s, ctx, me.id, target!.id, a.giveCardId!);
+        break;
+      case 'storm': {
+        const dmg = dealDamage(s, ctx, me.id, target!.id, 4);
+        log(s, ctx, `🌊 ${me.name}'s Storm Surge hits ${target!.name} for ${dmg}!`, 'play', me.id);
+        break;
+      }
+      case 'whirlpool':
+        log(s, ctx, `🌀 ${me.name} played Whirlpool on ${target!.name}!`, 'play', me.id);
+        swapHands(s, ctx, me.id, target!.id);
+        break;
+      case 'current':
+        log(s, ctx, `🔄 ${me.name} played Ocean Current!`, 'play', me.id);
+        rotateHands(s, ctx);
         break;
       case 'splash': {
         log(s, ctx, `🌊 ${me.name} unleashed a Surfactant Splash!`, 'play', me.id);

@@ -346,6 +346,32 @@ const ARTS: Record<string, ReactNode> = {
       <path d="M30 26 c 0 -6 2 -14 6 -18 M30 26 l-2 -4 M30 26 l3 -3" stroke="currentColor" strokeWidth={2} fill="none" strokeLinecap="round" />
     </>
   ),
+  wave: (
+    <>
+      <path d="M4 52 C 10 30, 22 14, 40 12 C 52 11, 60 18, 60 26 C 60 34, 52 36, 48 31 C 45 27, 50 22, 54 25 C 50 18, 40 18, 34 24 C 26 32, 26 44, 34 52 Z" fill={W} stroke="currentColor" strokeWidth={2.4} strokeLinejoin="round" />
+      <path d="M2 56 q 8 -4 15 0 t 15 0 t 15 0 t 15 0" stroke="currentColor" strokeWidth={2.4} fill="none" strokeLinecap="round" />
+      <path d="M18 36 q 4 -10 14 -14" stroke={WL} strokeWidth={2.4} fill="none" strokeLinecap="round" />
+      <circle cx={58} cy={12} r={2.5} fill={W} stroke="currentColor" strokeWidth={1.4} />
+      <circle cx={50} cy={6} r={1.8} fill={W} stroke="currentColor" strokeWidth={1.2} />
+    </>
+  ),
+  whirlpool: (
+    <>
+      <ellipse cx={32} cy={34} rx={27} ry={20} fill={W} opacity={0.45} stroke="currentColor" strokeWidth={2.2} />
+      <path d="M32 34 m -4 0 a 4 3 0 1 1 8 0 a 9 7 0 1 1 -18 0 a 14 10 0 1 1 28 0 a 19 14 0 1 1 -38 0" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" />
+      <rect x={42} y={14} width={8} height={11} rx={1.5} fill={WL} stroke="currentColor" strokeWidth={1.8} transform="rotate(25 46 19)" />
+    </>
+  ),
+  current: (
+    <>
+      <path d="M8 22 q 8 -6 16 0 t 16 0 t 16 0" stroke="currentColor" strokeWidth={2.4} fill="none" strokeLinecap="round" />
+      <path d="M8 42 q 8 -6 16 0 t 16 0 t 16 0" stroke={W} strokeWidth={4} fill="none" strokeLinecap="round" />
+      <path d="M8 42 q 8 -6 16 0 t 16 0 t 16 0" stroke="currentColor" strokeWidth={1.4} fill="none" strokeLinecap="round" opacity={0.6} />
+      <path d="M50 16 l 7 6 -7 6 M50 36 l 7 6 -7 6" stroke="currentColor" strokeWidth={2.4} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x={14} y={48} width={8} height={10} rx={1.5} fill={WL} stroke="currentColor" strokeWidth={1.6} transform="rotate(-12 18 53)" />
+      <rect x={30} y={48} width={8} height={10} rx={1.5} fill={WL} stroke="currentColor" strokeWidth={1.6} transform="rotate(10 34 53)" />
+    </>
+  ),
   hero: (
     <>
       <path d="M18 30 L8 56 L22 48 L30 58 L32 40 Z" fill="var(--cape, #f472b6)" opacity={0.6} stroke="currentColor" strokeWidth={1.8} strokeLinejoin="round" />

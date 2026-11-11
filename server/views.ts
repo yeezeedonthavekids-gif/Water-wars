@@ -22,10 +22,12 @@ export function publicView(s: GameState): PublicView {
       id: p.id, name: p.name, avatar: p.avatar, ready: p.ready, status: p.status, score: p.score, hp: p.hp,
       shield: p.shield, boost: p.boost, sets: p.sets, handCount: s.hands[p.id]?.length ?? 0, stats: p.stats,
       placement: p.placement,
+      called: !!p.called,
     })),
     round,
     maxRounds,
     maxHp: s.maxHp ?? BATTLE_HP,
+    drawStack: s.drawStack ?? 0,
     turn: s.turn
       ? {
           playerId: s.players[s.turn.idx]?.id ?? '',

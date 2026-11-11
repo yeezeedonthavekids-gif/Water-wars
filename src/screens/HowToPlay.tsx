@@ -44,6 +44,9 @@ export function RulesClassic() {
             <li><b>Real-World</b> (green) and <b>Power-Up</b> (pink) are <b>wild</b>: play them any time. Real-World cards ask you which property an example shows; a wrong answer means you draw 1.</li>
           </ul>
         </li>
+        <li><b>💦 Call SPLASH!</b> When you're down to your last card, hit the <b>SPLASH!</b> button fast. If you forget, anyone can hit <b>CATCH!</b> on you and you draw 2!</li>
+        <li><b>Stack the draws.</b> When someone hits you with a +2 or +4, you can play your own draw card to pass the whole pile to the next player. Can't stack? Take them all.</li>
+        <li><b>Twist cards:</b> 🌊 Storm Surge (+4, pick the color), 🌀 Whirlpool (swap your whole hand with anyone), 🔄 Ocean Current (everyone passes their hand along).</li>
         <li><b>Win</b> by playing your last card. If nobody does after 20 rounds, whoever has the fewest cards wins.</li>
       </ol>
       <div className="tip"><Icon name="info" size={16} /> Tip: save your wild cards for when nothing else matches!</div>
