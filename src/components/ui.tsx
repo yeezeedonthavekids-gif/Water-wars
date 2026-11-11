@@ -6,7 +6,7 @@ import { CardArt } from './CardArt';
 import { Icon } from './Icons';
 
 // ───────── Avatar ─────────
-export const AVATAR_COLORS = ['#4cc9f0', '#b18cff', '#ffc857', '#5ee6a0', '#ff7a8a', '#ff9ad5'];
+export const AVATAR_COLORS = ['#3aa0ff', '#a76bff', '#ffc12e', '#2fd27a', '#ff5c75', '#ff7ac8', '#ff8a3d', '#21c7c7', '#8fd14f', '#7b8cff'];
 
 export const Avatar = memo(function Avatar({ index, size = 40, name }: { index: number; size?: number; name?: string }) {
   const c = AVATAR_COLORS[index % AVATAR_COLORS.length];

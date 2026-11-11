@@ -54,7 +54,7 @@ export function RulesClassic() {
 export function RulesBattle() {
   return (
     <div className="rules">
-      <p className="lead">Inspired by battle card games: every player is a water drop with <b>20 HP</b>. Last drop standing wins!</p>
+      <p className="lead">Inspired by battle card games: every player is a water drop with <b>20 HP</b> (a bit less in rooms of 7+). Last drop standing wins!</p>
       <ol className="steps">
         <li><b>Setup.</b> Everyone gets 5 cards. At the start of your turn you draw 1 (up to 8 cards).</li>
         <li><b>Power-Up</b> (free, once per turn): shields, healing, H-Bond Boost (double damage), and more.</li>
@@ -70,7 +70,7 @@ export function RulesBattle() {
           </ul>
         </li>
         <li><b>Knockouts.</b> At 0 HP your drop evaporates. Knocking someone out earns bonus points.</li>
-        <li><b>Drought.</b> After round 10, every drop loses 1 HP at the start of its turn, so games always end.</li>
+        <li><b>Drought.</b> After a few rounds (round 10, or sooner in big games), every drop loses HP at the start of its turn, so games always end.</li>
       </ol>
       <div className="tip"><Icon name="info" size={16} /> Strategy: a Science Boost is risky but powerful. Know your science and it pays off!</div>
     </div>

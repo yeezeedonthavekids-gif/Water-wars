@@ -56,8 +56,8 @@ export function Countdown({ deadline, total, compact }: { deadline: number; tota
   );
 }
 
-export function HpBar({ hp, shield }: { hp: number; shield: number }) {
-  const pct = Math.max(0, (hp / BATTLE_HP) * 100);
+export function HpBar({ hp, shield, max = BATTLE_HP }: { hp: number; shield: number; max?: number }) {
+  const pct = Math.max(0, Math.min(100, (hp / max) * 100));
   return (
     <div className="hp">
       <div className={`hp-bar ${pct <= 30 ? 'low' : ''}`}>
@@ -116,7 +116,7 @@ export function OpponentChip({
           {p.name}
         </div>
         {battle ? (
-          p.status === 'out' ? <div className="ko-tag">KO</div> : <HpBar hp={p.hp} shield={p.shield} />
+          p.status === 'out' ? <div className="ko-tag">KO</div> : <HpBar hp={p.hp} shield={p.shield} max={view.maxHp} />
         ) : (
           <div className="opp-score">
             <b>{p.handCount}</b> {p.handCount === 1 ? 'card left!' : 'cards'}

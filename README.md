@@ -1,6 +1,6 @@
 # 💧 Water Wars
 
-A real-time multiplayer science card game about the three properties of water: **cohesion**, **adhesion** and **surface tension**. 2 to 6 players join a room with a 5-character code from any phone, tablet or computer, then play **Classic** (UNO-style) or **Battle** (drop vs. drop) mode. Science questions are part of the moves themselves: challenging an opponent, classifying a real-world example and boosting an attack all depend on answering correctly.
+A real-time multiplayer science card game about the three properties of water: **cohesion**, **adhesion** and **surface tension**. 2 to 10 players join a room with a 5-character code from any phone, tablet or computer, then play **Classic** (UNO-style) or **Battle** (drop vs. drop) mode. Science questions are part of the moves themselves: challenging an opponent, classifying a real-world example and boosting an attack all depend on answering correctly.
 
 <p align="center">
   <img src="docs/screenshots/menu-mobile.png" width="200" alt="Main menu" />
@@ -84,10 +84,10 @@ Every card is linked to cohesion, adhesion or surface tension. There are **42 un
 * **Win** by playing your last card. If nobody has after 20 rounds, the fewest cards wins.
 
 ### Battle mode, with the last drop standing winning
-* Every player is a drop with **20 HP**; draw 1 at the start of each turn.
+* Every player is a drop with **20 HP** (16 with 7–8 players, 14 with 9–10); draw 1 at the start of each turn.
 * One **Power-Up** per turn is free (shields, heals, H-Bond Boost for double damage).
 * Then play one card: **attack** with a property card, risk a **Science Boost** (correct = double damage, wrong = fizzle), or launch a **Combo** of two different properties with a combination question. Challenges, real-world cards and actions (Soap Disruptor pops shields, Surfactant Splash hits everyone) add variety. Or **Rest** to draw 1 and heal 1.
-* After round 10 a **drought** drains 1 HP per turn, so games always finish.
+* Later in the game a **drought** drains HP every turn (it starts at round 10, round 8 with 5–7 players, round 6 with 8–10), so games always finish.
 
 Turns have a 90-second timer (45 s for questions, 30 s for trades). A disconnected player's turn is skipped automatically after 20 seconds, so nobody can stall the game.
 
@@ -141,8 +141,8 @@ The dev API reads the local Supabase keys automatically (via `npx supabase statu
 
 | Command | What it does |
 |---|---|
-| `npm test` | Engine tests: card database checks, rules enforcement, hidden-info checks, plus **600 fuzzed full games** (both modes, 2–6 players) asserting card conservation, termination and that rejected moves never change state |
-| `npm run test:security` | With `npm run dev` running: **41 integration checks** against the live API + database (forged/impersonated tokens, the public key can't read or modify tables, other hands never sent, turn enforcement, 6 simultaneous duplicate moves apply once, 8 simultaneous joins fill exactly 6 seats, host handover, room deletion) |
+| `npm test` | Engine tests: card database checks, rules enforcement, hidden-info checks, plus **600 fuzzed full games** (both modes, 2–10 players) asserting card conservation, termination and that rejected moves never change state |
+| `npm run test:security` | With `npm run dev` running: **41 integration checks** against the live API + database (forged/impersonated tokens, the public key can't read or modify tables, other hands never sent, turn enforcement, 6 simultaneous duplicate moves apply once, 12 simultaneous joins fill exactly 10 seats, host handover, room deletion) |
 | `npm run build` | Typecheck + production build into `dist/` |
 
 ### What was tested

@@ -175,7 +175,7 @@ export function MenuScreen({ navigate, joinCode }: { navigate: (r: Route) => voi
           </form>
         )}
       </div>
-      <footer className="menu-foot">2–6 players · phones, tablets &amp; computers</footer>
+      <footer className="menu-foot">2–10 players · phones, tablets &amp; computers</footer>
     </main>
   );
 }

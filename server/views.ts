@@ -1,5 +1,6 @@
 // Projects the full server state into what each client may see.
 import type { PublicPending, PublicView } from '../src/shared/types';
+import { BATTLE_HP } from '../src/shared/types';
 import { currentRoundInfo, type GameState } from './engine';
 
 export function publicView(s: GameState): PublicView {
@@ -24,6 +25,7 @@ export function publicView(s: GameState): PublicView {
     })),
     round,
     maxRounds,
+    maxHp: s.maxHp ?? BATTLE_HP,
     turn: s.turn
       ? {
           playerId: s.players[s.turn.idx]?.id ?? '',

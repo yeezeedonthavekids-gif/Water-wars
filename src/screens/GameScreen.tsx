@@ -272,7 +272,7 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
           <div>
             <div className="me-name">{me.name} <span className="you-tag">you</span></div>
             {battle ? (
-              me.status === 'out' ? <div className="ko-tag">KO</div> : <HpBar hp={me.hp} shield={me.shield} />
+              me.status === 'out' ? <div className="ko-tag">KO</div> : <HpBar hp={me.hp} shield={me.shield} max={view.maxHp} />
             ) : (
               <div className="me-score">
                 <b>{hand.length}</b> {hand.length === 1 ? 'card left!' : 'cards left'}

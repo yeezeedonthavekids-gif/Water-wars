@@ -30,6 +30,11 @@ export const BATTLE_HAND = 5;
 export const CLASSIC_ROUNDS = 20;
 export const BATTLE_ROUNDS = 20;
 export const DROUGHT_ROUND = 10;
+/** Bigger Battle games start the drought sooner so they still fit in a class period. */
+export function droughtRound(players: number) {
+  return players <= 4 ? DROUGHT_ROUND : players <= 7 ? 8 : 6;
+}
+const droughtDamage = (s: { round: number; players: unknown[] }) => (s.round - droughtRound(s.players.length) > 3 ? 2 : 1);
 export const BATTLE_HAND_LIMIT = 8;
 export const SHIELD_CAP = 8;
 export const SET_BONUS_CORRECT = 6;
@@ -133,6 +138,8 @@ export interface GameState {
   winnerIds: string[];
   /** Set while resolving a question that grants the asker another turn. */
   extraTurn?: boolean;
+  /** Battle starting/maximum HP for this game. */
+  maxHp?: number;
 }
 
 // ───────────────────────── Helpers ─────────────────────────
@@ -257,8 +264,13 @@ function nextIdx(s: GameState, from: number, steps = 1): number {
   return idx;
 }
 
-function heal(p: PlayerState, n: number) {
-  p.hp = Math.min(BATTLE_HP, p.hp + n);
+/** Starting (and maximum) HP in Battle: lower in big rooms so games still fit in a class period. */
+export function battleHp(players: number) {
+  return players <= 6 ? BATTLE_HP : players <= 8 ? 16 : 14;
+}
+
+function heal(s: GameState, p: PlayerState, n: number) {
+  p.hp = Math.min(s.maxHp ?? BATTLE_HP, p.hp + n);
 }
 
 /** Battle damage with shields and knockouts. Returns damage actually taken. */
@@ -470,8 +482,9 @@ export function startGame(s: GameState, ctx: Ctx, uid: string) {
   s.turnsInRound = 0;
   s.activeProperty = null;
   shuffle(s.players, ctx.rng);
+  s.maxHp = battleHp(s.players.length);
   for (const p of s.players) {
-    Object.assign(p, { status: 'active', score: 0, hp: BATTLE_HP, shield: 0, boost: false, sets: 0, stats: freshStats() });
+    Object.assign(p, { status: 'active', score: 0, hp: s.maxHp, shield: 0, boost: false, sets: 0, stats: freshStats() });
     delete p.placement;
     s.hands[p.id] = [];
     drawCards(s, ctx, p.id, s.mode === 'classic' ? CLASSIC_HAND : BATTLE_HAND);
@@ -523,9 +536,10 @@ function beginTurn(s: GameState, ctx: Ctx, idx: number, guard = 0) {
   t.deadline = ctx.now + TURN_MS;
   const p = s.players[idx];
   if (s.mode === 'battle') {
-    if (s.round > DROUGHT_ROUND) {
-      log(s, ctx, `☀️ Drought! ${p.name} loses 1 HP to evaporation.`, 'bad', p.id);
-      dealDamage(s, ctx, null, p.id, 1);
+    if (s.round > droughtRound(s.players.length)) {
+      const dmg = droughtDamage(s);
+      log(s, ctx, `☀️ Drought! ${p.name} loses ${dmg} HP to evaporation.`, 'bad', p.id);
+      dealDamage(s, ctx, null, p.id, dmg);
       if (p.status !== 'active') {
         if (checkGameEnd(s, ctx)) return;
         if (guard < s.players.length) return advanceTurn(s, ctx, 1, guard + 1);
@@ -546,8 +560,11 @@ function advanceTurn(s: GameState, ctx: Ctx, steps: number, guard = 0) {
       finishGame(s, ctx, `Round limit reached.`);
       return;
     }
-    if (s.mode === 'battle' && s.round === DROUGHT_ROUND + 1) {
-      log(s, ctx, '☀️ The drought begins: every drop loses 1 HP at the start of its turn!', 'system');
+    if (s.mode === 'battle' && s.round === droughtRound(s.players.length) + 1) {
+      log(s, ctx, '☀️ The drought begins: every drop loses HP at the start of its turn!', 'system');
+    }
+    if (s.mode === 'battle' && s.round === droughtRound(s.players.length) + 4) {
+      log(s, ctx, '🔥 The drought gets worse: 2 HP per turn now!', 'system');
     }
   }
   const from = s.turn!.idx;
@@ -666,7 +683,7 @@ function applyPurpose(s: GameState, ctx: Ctx, q: PendingQuestion, correct: boole
         return `${target?.name} draws 2 cards.`;
       }
       if (correct) {
-        if (target) heal(target, 1);
+        if (target) heal(s, target, 1);
         return `${target?.name} heals 1.`;
       }
       const dmg = dealDamage(s, ctx, pu.challengerId, pu.targetId, def.power);
@@ -713,7 +730,7 @@ function applyPurpose(s: GameState, ctx: Ctx, q: PendingQuestion, correct: boole
         return `${asker.name} draws 1 card.`;
       }
       if (!correct || !asker) return 'No bonus this time.';
-      heal(asker, 4);
+      heal(s, asker, 4);
       drawCards(s, ctx, asker.id, 1);
       return 'Heals 4 and draws 1.';
     }
@@ -1013,7 +1030,7 @@ function battleAction(s: GameState, ctx: Ctx, me: PlayerState, a: GameAction) {
   switch (a.type) {
     case 'rest': {
       drawCards(s, ctx, me.id, 1);
-      heal(me, 1);
+      heal(s, me, 1);
       log(s, ctx, `💤 ${me.name} rested: drew 1 and healed 1.`, 'play', me.id);
       setLast(s, ctx, { type: 'draw', actorId: me.id, amount: 1 });
       return finishTurn(s, ctx);
@@ -1155,13 +1172,13 @@ function battlePlay(s: GameState, ctx: Ctx, me: PlayerState, a: Extract<GameActi
   switch (def.effect) {
     case 'waterPower':
       if (a.choice === 'draw') drawCards(s, ctx, me.id, 2);
-      else if (a.choice === 'points') heal(me, 3);
+      else if (a.choice === 'points') heal(s, me, 3);
       else me.shield = Math.min(SHIELD_CAP, me.shield + 3);
       log(s, ctx, `⭐ ${me.name} used Water Power: ${a.choice === 'draw' ? 'drew 2 cards' : a.choice === 'points' ? 'healed 3' : '+3 shield'}.`, 'play', me.id);
       break;
     case 'wildBond':
       drawCards(s, ctx, me.id, 1);
-      heal(me, 2);
+      heal(s, me, 2);
       log(s, ctx, `🔗 ${me.name} played Wild Bond: drew 1 and healed 2.`, 'play', me.id);
       break;
     case 'hbond':
@@ -1173,7 +1190,7 @@ function battlePlay(s: GameState, ctx: Ctx, me: PlayerState, a: Extract<GameActi
       log(s, ctx, `🛡️ ${me.name} raised a Surface Shield (+5).`, 'play', me.id);
       break;
     case 'rain':
-      heal(me, 5);
+      heal(s, me, 5);
       log(s, ctx, `🌧️ ${me.name} played Rain Refill: healed 5.`, 'play', me.id);
       break;
     case 'star': {

@@ -248,7 +248,7 @@ describe('fuzz: full random games terminate and conserve cards', () => {
       let finished = 0;
       for (let g = 0; g < 300; g++) {
         const rng = seeded(1000 + g);
-        const n = 2 + (g % 5);
+        const n = 2 + (g % 9);
         const { s, ctx } = setup(n, mode, rng);
         let steps = 0;
         while (s.phase === 'playing' && steps < 3000) {

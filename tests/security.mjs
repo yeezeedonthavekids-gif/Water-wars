@@ -100,10 +100,10 @@ check('player who left can no longer read the room', (await guest.state(code)).e
 // ── Lobby races & host handover ──
 const h2 = await player();
 const code2 = (await h2.post({ op: 'create', name: 'Host2' })).code;
-const crowd = await Promise.all(Array.from({ length: 8 }, () => player()));
+const crowd = await Promise.all(Array.from({ length: 12 }, () => player()));
 const joins = await Promise.all(crowd.map((p, i) => p.post({ op: 'join', code: code2, name: `P${i}` })));
 const lobby = (await h2.state(code2)).state.public;
-check(`8 simultaneous joins into a 6-seat room: ${joins.filter((j) => j.ok).length} admitted, room has ${lobby.players.length}`, joins.filter((j) => j.ok).length === 5 && lobby.players.length === 6 && joins.filter((j) => j.error === 'ROOM_FULL').length === 3);
+check(`12 simultaneous joins into a 10-seat room: ${joins.filter((j) => j.ok).length} admitted, room has ${lobby.players.length}`, joins.filter((j) => j.ok).length === 9 && lobby.players.length === 10 && joins.filter((j) => j.error === 'ROOM_FULL').length === 3);
 await h2.post({ op: 'leave', code: code2 });
 const lobby2 = (await crowd.find((_, i) => joins[i].ok).state(code2)).state.public;
 check('host leaving hands host to another player', lobby2.hostId !== h2.uid && lobby2.players.some((p) => p.id === lobby2.hostId));

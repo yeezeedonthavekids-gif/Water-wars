@@ -154,6 +154,8 @@ export interface PublicView {
   players: PublicPlayer[];
   round: number;
   maxRounds: number;
+  /** Battle: starting/maximum HP this game. */
+  maxHp: number;
   turn: PublicTurn | null;
   activeProperty: Property | null;
   discardTop: string | null;
@@ -216,5 +218,5 @@ export interface ClientConfig {
 }
 
 export const MIN_PLAYERS = 2;
-export const MAX_PLAYERS = 6;
+export const MAX_PLAYERS = 10;
 export const BATTLE_HP = 20;
