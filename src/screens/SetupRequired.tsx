@@ -24,7 +24,7 @@ export function SetupRequired({ missing, error }: { missing?: string[]; error?: 
                 </li>
               ))}
             </ul>
-            <p className="muted">Step-by-step instructions are in the project README (Firebase setup takes about 5 minutes).</p>
+            <p className="muted">Step-by-step instructions are in the project README (Supabase setup takes about 5 minutes).</p>
           </>
         )}
         <button className="btn btn-secondary" onClick={() => location.reload()}>

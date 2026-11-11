@@ -5,7 +5,7 @@ import { QUESTIONS, CHALLENGE_QUESTION, REALWORLD } from '../server/answers';
 import {
   applyGameAction, createState, GameError, joinRoom, leaveRoom, rematch, setReady, startGame, type Ctx, type GameState,
 } from '../server/engine';
-import { publicView, serializeRoom } from '../server/views';
+import { publicView } from '../server/views';
 
 function seeded(seed: number) {
   return () => {
@@ -174,7 +174,7 @@ describe('rules enforcement', () => {
     expect(s.pending?.kind).toBe('question');
     const pv = publicView(s);
     expect(JSON.stringify(pv.pending)).not.toMatch(/"answer"|"explain"|"purpose"/);
-    expect(serializeRoom(s).public).not.toContain('"answer"');
+    expect(JSON.stringify(pv)).not.toContain('"answer"');
     expect(() => applyGameAction(s, ctx, cur, { type: 'answer', choice: 1 })).toThrow(/someone else/i);
     const before = s.players.find((p) => p.id === target)!.score;
     applyGameAction(s, ctx, target, { type: 'answer', choice: 1 }); // s1 answer is index 1
@@ -182,14 +182,13 @@ describe('rules enforcement', () => {
     expect(s.lastQuestion?.correct).toBe(true);
   });
 
-  it('private views never include other hands', () => {
+  it('the public view never includes hands or the deck order', () => {
     const { s } = setup(4, 'battle', seeded(4));
-    const rec = serializeRoom(s);
-    for (const [uid, json] of Object.entries(rec.private)) {
-      const v = JSON.parse(json);
-      expect(v.hand).toEqual(s.hands[uid]);
-    }
-    expect(rec.public).not.toContain(s.hands.p1[0] + '"'); // public shows counts only (cards may coincide with discardTop rarely)
+    const pv = publicView(s) as unknown as Record<string, unknown>;
+    expect(pv.hands).toBeUndefined();
+    expect(pv.deck).toBeUndefined();
+    expect(pv.usedQuestions).toBeUndefined();
+    expect((pv.players as { handCount: number }[]).map((p) => p.handCount)).toEqual(s.players.map((p) => s.hands[p.id].length));
   });
 
   it('leaving mid-game keeps the game consistent', () => {

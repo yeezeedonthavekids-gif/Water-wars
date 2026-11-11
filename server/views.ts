@@ -1,5 +1,5 @@
 // Projects the full server state into what each client may see.
-import type { PrivateView, PublicPending, PublicView } from '../src/shared/types';
+import type { PublicPending, PublicView } from '../src/shared/types';
 import { currentRoundInfo, type GameState } from './engine';
 
 export function publicView(s: GameState): PublicView {
@@ -49,27 +49,4 @@ export function publicView(s: GameState): PublicView {
     startedAt: s.startedAt,
     updatedAt: s.updatedAt,
   };
-}
-
-export function privateView(s: GameState, uid: string): PrivateView {
-  return { version: s.version, hand: s.hands[uid] ?? [] };
-}
-
-/** The exact shape stored at /rooms/{code} in the Realtime Database. Values are JSON strings to avoid RTDB array quirks. */
-export interface RoomRecord {
-  secret: string;
-  public: string;
-  private: Record<string, string>;
-  members: Record<string, true>;
-}
-
-export function serializeRoom(s: GameState): RoomRecord {
-  const members: Record<string, true> = {};
-  const priv: Record<string, string> = {};
-  for (const p of s.players) {
-    if (p.status === 'left') continue;
-    members[p.id] = true;
-    priv[p.id] = JSON.stringify(privateView(s, p.id));
-  }
-  return { secret: JSON.stringify(s), public: JSON.stringify(publicView(s)), private: priv, members };
 }

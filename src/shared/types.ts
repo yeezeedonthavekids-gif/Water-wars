@@ -1,5 +1,5 @@
 // Types shared by the browser client and the server (Netlify function).
-// The server owns the full GameState; clients only ever receive PublicView + PrivateView.
+// The server owns the full GameState; clients only ever receive the public view + their own hand.
 
 export type Property = 'cohesion' | 'adhesion' | 'surface';
 export type Category = 'cohesion' | 'adhesion' | 'surface' | 'challenge' | 'action' | 'realworld' | 'powerup';
@@ -168,11 +168,6 @@ export interface PublicView {
   updatedAt: number;
 }
 
-export interface PrivateView {
-  version: number;
-  hand: string[];
-}
-
 export interface PresenceEntry {
   online: boolean;
   at: number;
@@ -180,6 +175,7 @@ export interface PresenceEntry {
 
 /** Requests the client sends to POST /api */
 export type ApiRequest =
+  | { op: 'session' }
   | { op: 'create'; name: string; mode?: Mode }
   | { op: 'join'; code: string; name: string }
   | { op: 'leave'; code: string }
@@ -192,9 +188,21 @@ export type ApiRequest =
   | { op: 'kick'; code: string; playerId: string }
   | { op: 'action'; code: string; action: GameAction };
 
+/** What GET /api/state (and every successful action) returns: the caller's view of the room. */
+export interface RoomSnapshot {
+  version: number;
+  public: PublicView;
+  hand: string[];
+  /** Realtime channel that pings when the room changes. */
+  topic: string;
+}
+
 export interface ApiResponse {
   ok: boolean;
   code?: string;
+  uid?: string;
+  token?: string;
+  state?: RoomSnapshot | null;
   error?: string;
   message?: string;
   serverNow: number;
@@ -203,13 +211,7 @@ export interface ApiResponse {
 export interface ClientConfig {
   configured: boolean;
   missing?: string[];
-  firebase?: {
-    apiKey: string;
-    authDomain: string;
-    databaseURL: string;
-    projectId: string;
-  };
-  emulator?: { auth: string; dbHost: string; dbPort: number };
+  supabase?: { url: string; publishableKey: string };
 }
 
 export const MIN_PLAYERS = 2;

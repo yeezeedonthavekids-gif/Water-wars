@@ -125,7 +125,7 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
     const offlineLong = pres && !pres.online && serverNow() - pres.at > 20000 + stagger;
     const expired = serverNow() > deadline + stagger;
     if (!expired && !offlineLong) return;
-    const key = `${deadline}:${responsible}:${offlineLong ? 'off' : 'exp'}`;
+    const key = `${deadline}:${responsible}:${offlineLong ? `off${Math.floor(serverNow() / 5000)}` : 'exp'}`;
     if (timeoutKey.current === key) return;
     timeoutKey.current = key;
     void send({ type: 'timeout' }, { quiet: true });

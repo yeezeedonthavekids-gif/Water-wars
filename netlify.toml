@@ -8,8 +8,6 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
-  # firebase-admin is bundled by esbuild on purpose: its dependency `jose` is ESM-only and
-  # fails to require() in the function runtime when shipped as an external module.
 
 # The game API is a single function mounted at /api/* (see netlify/functions/api.mts).
 

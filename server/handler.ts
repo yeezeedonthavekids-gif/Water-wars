@@ -1,24 +1,26 @@
 // HTTP handler for the game API. Used by the Netlify function and the local dev server.
-// Every state change runs inside a Realtime Database transaction on /rooms/{code}, so concurrent
-// actions are serialised and no client can write game state directly.
-import type { ApiRequest, ApiResponse, Mode, PresenceEntry } from '../src/shared/types';
+// Clients never write game state: they send intents here, the engine validates them, and the result is
+// committed with optimistic concurrency in Supabase.
+import type { ApiRequest, ApiResponse, Mode, RoomSnapshot } from '../src/shared/types';
 import {
   applyGameAction, claimHost, createState, GameError, joinRoom, kickPlayer, leaveRoom, rematch, renamePlayer,
-  setMode, setReady, startGame, type Ctx, type GameState,
+  setMode, setReady, startGame, type GameState,
 } from './engine';
-import { admin, clientConfig, missingConfig } from './firebase';
-import { serializeRoom, type RoomRecord } from './views';
+import { newSession, verifySession } from './session';
+import {
+  cleanupOldRooms, clientConfig, createRoom, missingConfig, mutateRoom, offlinePlayers, readRoom, roomTopic, touch,
+  type Mutator,
+} from './store';
+import { publicView } from './views';
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_RE = /^[A-Z2-9]{5}$/;
-const ROOM_TTL_MS = 8 * 60 * 60 * 1000;
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
     headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
   });
-
 const ok = (extra: Partial<ApiResponse> = {}) => json({ ok: true, serverNow: Date.now(), ...extra });
 const err = (error: string, message: string, status = 200) => json({ ok: false, error, message, serverNow: Date.now() }, status);
 
@@ -27,194 +29,123 @@ function genCode() {
   return Array.from(bytes, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('');
 }
 
-function rng() {
-  return crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32;
+/** The caller's personal view: public state + only their own hand. */
+function snapshot(s: GameState | null, uid: string): RoomSnapshot | null {
+  if (!s) return null;
+  const me = s.players.find((p) => p.id === uid);
+  if (!me || me.status === 'left') return null;
+  return { version: s.version, public: publicView(s), hand: s.hands[uid] ?? [], topic: roomTopic(s.code) };
 }
 
-async function readOffline(code: string): Promise<Record<string, number>> {
-  const snap = await admin().db.ref(`presence/${code}`).get();
-  const out: Record<string, number> = {};
-  const val = (snap.val() ?? {}) as Record<string, PresenceEntry>;
-  for (const [uid, p] of Object.entries(val)) if (p && p.online === false) out[uid] = p.at;
-  return out;
-}
-
-type Mutator = (s: GameState, ctx: Ctx) => 'deleted' | unknown;
-
-async function mutateRoom(code: string, fn: Mutator, offline?: Record<string, number>) {
-  const { db } = admin();
-  const ref = db.ref(`rooms/${code}`);
-  let gameErr: GameError | null = null;
-  let deleted = false;
-  const result = await ref.transaction(
-    (cur: RoomRecord | null) => {
-      gameErr = null;
-      deleted = false;
-      if (cur === null || typeof cur.secret !== 'string') return null; // not cached yet / missing
-      const s = JSON.parse(cur.secret) as GameState;
-      const ctx: Ctx = { now: Date.now(), rng, offline };
-      try {
-        if (fn(s, ctx) === 'deleted') {
-          deleted = true;
-          return null;
-        }
-      } catch (e) {
-        if (e instanceof GameError) {
-          gameErr = e;
-          return cur; // unchanged write: verified against the server copy, so errors are never based on stale data
-        }
-        throw e;
-      }
-      s.version += 1;
-      s.updatedAt = ctx.now;
-      return serializeRoom(s);
-    },
-    undefined,
-    false,
-  );
-  if (gameErr) throw gameErr;
-  if (deleted) {
-    await Promise.all([db.ref(`presence/${code}`).remove(), db.ref(`roomIndex/${code}`).remove()]);
-    return;
-  }
-  if (!result.snapshot.exists()) throw new GameError('ROOM_NOT_FOUND', 'That room does not exist. Check the code!');
-}
-
-async function createRoom(uid: string, name: string, mode: Mode): Promise<string> {
-  const { db } = admin();
-  for (let attempt = 0; attempt < 6; attempt++) {
-    const code = genCode();
-    let created = false;
-    const now = Date.now();
-    const state = createState(code, uid, name, mode, now); // validates name (may throw)
-    await db.ref(`rooms/${code}`).transaction(
-      (cur) => {
-        if (cur !== null) {
-          created = false;
-          return undefined; // code taken: abort and try another
-        }
-        created = true;
-        return serializeRoom(state);
-      },
-      undefined,
-      false,
-    );
-    if (created) {
-      await db.ref(`roomIndex/${code}`).set(now);
-      return code;
-    }
-  }
-  throw new GameError('BUSY', 'Could not create a room. Please try again.');
-}
-
-/** Free-tier hygiene: remove rooms older than ROOM_TTL_MS. Best-effort. */
-async function cleanupOldRooms() {
-  try {
-    const { db } = admin();
-    const snap = await db.ref('roomIndex').orderByValue().endAt(Date.now() - ROOM_TTL_MS).limitToFirst(25).get();
-    const updates: Record<string, null> = {};
-    snap.forEach((child) => {
-      updates[`rooms/${child.key}`] = null;
-      updates[`presence/${child.key}`] = null;
-      updates[`roomIndex/${child.key}`] = null;
-    });
-    if (Object.keys(updates).length) await db.ref().update(updates);
-  } catch (e) {
-    console.warn('cleanup failed', e);
-  }
-}
-
-async function authenticate(req: Request): Promise<string | null> {
+function authenticate(req: Request): string | null {
   const h = req.headers.get('authorization') ?? '';
-  const token = h.startsWith('Bearer ') ? h.slice(7) : '';
-  if (!token) return null;
-  try {
-    const decoded = await admin().auth.verifyIdToken(token);
-    return decoded.uid;
-  } catch {
-    return null;
-  }
+  return h.startsWith('Bearer ') ? verifySession(h.slice(7)) : null;
 }
 
 const isMode = (m: unknown): m is Mode => m === 'classic' || m === 'battle';
+const parseCode = (raw: unknown) => (typeof raw === 'string' ? raw.toUpperCase().trim() : '');
 
 export async function handleApi(req: Request): Promise<Response> {
   const url = new URL(req.url);
-  if (req.method === 'GET' && url.pathname.endsWith('/config')) {
-    return json(clientConfig());
-  }
-  if (req.method === 'GET' && url.pathname.endsWith('/health')) {
-    return json({ ok: true, configured: missingConfig().length === 0, serverNow: Date.now() });
-  }
-  if (req.method !== 'POST') return err('METHOD', 'Use POST.', 405);
-  if (missingConfig().length) return err('NOT_CONFIGURED', 'The game server is not configured yet.', 503);
-
-  const raw = await req.text();
-  if (raw.length > 4000) return err('TOO_LARGE', 'Request too large.', 413);
-  let body: ApiRequest;
+  const path = url.pathname.replace(/\/+$/, '');
   try {
-    body = JSON.parse(raw);
-  } catch {
-    return err('BAD_JSON', 'Invalid request.', 400);
-  }
-  if (!body || typeof body !== 'object' || typeof body.op !== 'string') return err('BAD_REQUEST', 'Invalid request.', 400);
+    if (req.method === 'GET' && path.endsWith('/config')) return json(clientConfig());
+    if (req.method === 'GET' && path.endsWith('/health')) {
+      return json({ ok: true, configured: missingConfig().length === 0, serverNow: Date.now() });
+    }
+    if (missingConfig().length) return err('NOT_CONFIGURED', 'The game server is not configured yet.', 503);
 
-  const uid = await authenticate(req);
-  if (!uid) return err('UNAUTHENTICATED', 'Your session expired. Please reload the page.', 401);
-
-  try {
-    if (body.op === 'create') {
-      const code = await createRoom(uid, body.name, isMode(body.mode) ? body.mode : 'classic');
-      await cleanupOldRooms();
-      return ok({ code });
+    // GET /api/state?code=XXXXX : my current view of a room (also acts as a "still connected" heartbeat).
+    if (req.method === 'GET' && path.endsWith('/state')) {
+      const uid = authenticate(req);
+      if (!uid) return err('UNAUTHENTICATED', 'Your session expired. Please reload the page.', 401);
+      const code = parseCode(url.searchParams.get('code'));
+      if (!CODE_RE.test(code)) return err('BAD_CODE', 'Room codes are 5 letters/numbers.');
+      const s = await readRoom(code);
+      const snap = snapshot(s, uid);
+      if (!snap) return err('NOT_IN_ROOM', 'You are not in this room.');
+      await touch(code, uid);
+      return ok({ code, state: snap });
     }
 
-    const code = typeof (body as { code?: unknown }).code === 'string' ? (body as { code: string }).code.toUpperCase().trim() : '';
+    if (req.method !== 'POST') return err('METHOD', 'Use POST.', 405);
+    const raw = await req.text();
+    if (raw.length > 4000) return err('TOO_LARGE', 'Request too large.', 413);
+    let body: ApiRequest;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return err('BAD_JSON', 'Invalid request.', 400);
+    }
+    if (!body || typeof body !== 'object' || typeof body.op !== 'string') return err('BAD_REQUEST', 'Invalid request.', 400);
+
+    if (body.op === 'session') return ok(newSession());
+
+    const uid = authenticate(req);
+    if (!uid) return err('UNAUTHENTICATED', 'Your session expired. Please reload the page.', 401);
+
+    if (body.op === 'create') {
+      const mode = isMode(body.mode) ? body.mode : 'classic';
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const code = genCode();
+        const state = createState(code, uid, body.name, mode, Date.now()); // validates name (may throw)
+        if (await createRoom(code, state)) {
+          await Promise.all([touch(code, uid), cleanupOldRooms()]);
+          return ok({ code, state: snapshot(state, uid) });
+        }
+      }
+      return err('BUSY', 'Could not create a room. Please try again.');
+    }
+
+    const code = parseCode((body as { code?: unknown }).code);
     if (!CODE_RE.test(code)) return err('BAD_CODE', 'Room codes are 5 letters/numbers.');
 
+    let fn: Mutator;
+    let offline: Record<string, number> | undefined;
     switch (body.op) {
       case 'join':
-        await mutateRoom(code, (s, ctx) => joinRoom(s, ctx, uid, body.name));
+        fn = (s, ctx) => joinRoom(s, ctx, uid, body.name);
         break;
       case 'leave':
-        await mutateRoom(code, (s, ctx) => leaveRoom(s, ctx, uid));
+        fn = (s, ctx) => leaveRoom(s, ctx, uid);
         break;
       case 'ready':
-        await mutateRoom(code, (s) => setReady(s, uid, !!body.ready));
+        fn = (s) => setReady(s, uid, !!body.ready);
         break;
       case 'rename':
-        await mutateRoom(code, (s, ctx) => renamePlayer(s, ctx, uid, body.name));
+        fn = (s, ctx) => renamePlayer(s, ctx, uid, body.name);
         break;
       case 'mode':
         if (!isMode(body.mode)) return err('BAD_MODE', 'Unknown mode.');
-        await mutateRoom(code, (s) => setMode(s, uid, body.mode));
+        fn = (s) => setMode(s, uid, body.mode);
         break;
       case 'start':
-        await mutateRoom(code, (s, ctx) => startGame(s, ctx, uid));
+        fn = (s, ctx) => startGame(s, ctx, uid);
         break;
       case 'rematch':
-        await mutateRoom(code, (s, ctx) => rematch(s, ctx, uid));
+        fn = (s, ctx) => rematch(s, ctx, uid);
         break;
       case 'kick':
         if (typeof body.playerId !== 'string') return err('BAD_REQUEST', 'Invalid player.');
-        await mutateRoom(code, (s, ctx) => kickPlayer(s, ctx, uid, body.playerId));
+        fn = (s, ctx) => kickPlayer(s, ctx, uid, body.playerId);
         break;
-      case 'claimHost': {
-        const offline = await readOffline(code);
-        await mutateRoom(code, (s, ctx) => claimHost(s, ctx, uid), offline);
+      case 'claimHost':
+        offline = await offlinePlayers(code);
+        fn = (s, ctx) => claimHost(s, ctx, uid);
         break;
-      }
       case 'action': {
         const action = body.action;
         if (!action || typeof action !== 'object' || typeof action.type !== 'string') return err('BAD_ACTION', 'Invalid action.');
-        const offline = action.type === 'timeout' ? await readOffline(code) : undefined;
-        await mutateRoom(code, (s, ctx) => applyGameAction(s, ctx, uid, action), offline);
+        if (action.type === 'timeout') offline = await offlinePlayers(code);
+        fn = (s, ctx) => applyGameAction(s, ctx, uid, action);
         break;
       }
       default:
         return err('BAD_OP', 'Unknown operation.', 400);
     }
-    return ok({ code });
+    const next = await mutateRoom(code, fn, offline);
+    if (body.op !== 'leave') await touch(code, uid);
+    return ok({ code, state: snapshot(next, uid) });
   } catch (e) {
     if (e instanceof GameError) return err(e.code, e.message);
     console.error('API error', e);

@@ -1,11 +1,19 @@
 // Local stand-in for Netlify Functions: serves the exact same handler on http://127.0.0.1:8787.
-// Pair it with the Firebase emulators (npm run emulators) — see README.
+// If SUPABASE_* variables aren't set, it reads the keys of a local Supabase started with
+// `npm run supabase:start` (see README) via `npx supabase status`.
+import { execSync } from 'node:child_process';
 import { createServer } from 'node:http';
 
-process.env.FIREBASE_DATABASE_EMULATOR_HOST ??= '127.0.0.1:9000';
-process.env.FIREBASE_AUTH_EMULATOR_HOST ??= '127.0.0.1:9099';
-process.env.GCLOUD_PROJECT ??= 'demo-water-wars';
-process.env.FIREBASE_DATABASE_URL ??= 'https://demo-water-wars-default-rtdb.firebaseio.com';
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SECRET_KEY) {
+  try {
+    const status = JSON.parse(execSync('npx supabase status -o json', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }));
+    process.env.SUPABASE_URL ??= status.API_URL;
+    process.env.SUPABASE_PUBLISHABLE_KEY ??= status.PUBLISHABLE_KEY ?? status.ANON_KEY;
+    process.env.SUPABASE_SECRET_KEY ??= status.SECRET_KEY ?? status.SERVICE_ROLE_KEY;
+  } catch {
+    console.warn('[dev-api] No SUPABASE_* env vars and no local Supabase found. Run `npm run supabase:start` first.');
+  }
+}
 
 const { handleApi } = await import('../server/handler');
 const port = Number(process.env.API_PORT ?? 8787);
@@ -27,4 +35,4 @@ createServer(async (req, res) => {
     console.error(e);
     res.writeHead(500).end('dev api error');
   }
-}).listen(port, '0.0.0.0', () => console.log(`[dev-api] listening on http://127.0.0.1:${port}`));
+}).listen(port, '0.0.0.0', () => console.log(`[dev-api] listening on http://127.0.0.1:${port} (Supabase: ${process.env.SUPABASE_URL})`));

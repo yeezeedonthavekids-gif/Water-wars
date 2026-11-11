@@ -1,8 +1,8 @@
-// One command local dev: Firebase emulators + game API + Vite.
+// One command local dev: game API (same handler as the Netlify function) + Vite.
+// Start Supabase first with `npx supabase start` (needs Docker) — see README.
 import { spawn } from 'node:child_process';
 
 const procs = [
-  ['emulators', 'npx', ['--yes', 'firebase-tools', 'emulators:start', '--only', 'auth,database', '--project', 'demo-water-wars']],
   ['api', 'npx', ['tsx', 'watch', 'scripts/dev-api.ts']],
   ['web', 'npx', ['vite']],
 ];

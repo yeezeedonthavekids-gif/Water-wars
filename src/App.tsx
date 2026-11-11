@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { loadConfig } from './client/firebase';
+import { loadConfig } from './client/session';
 import { lastRoom, saveRoom } from './client/settings';
 import { Spinner, ToastProvider } from './components/ui';
 import { MenuScreen } from './screens/MenuScreen';

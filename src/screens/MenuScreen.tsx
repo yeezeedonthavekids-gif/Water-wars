@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Route } from '../App';
 import { api, ApiError } from '../client/api';
-import { ensureUser } from '../client/firebase';
+import { ensureSession } from '../client/session';
 import { lastRoom, saveRoom, updateSettings, useSettings } from '../client/settings';
 import { sfx } from '../client/sound';
 import { Icon } from '../components/Icons';
@@ -20,7 +20,7 @@ export function MenuScreen({ navigate, joinCode }: { navigate: (r: Route) => voi
 
   useEffect(() => {
     // Warm up auth in the background so Create/Join feel instant.
-    ensureUser().catch(() => {});
+    ensureSession().catch(() => {});
   }, []);
 
   useEffect(() => {
