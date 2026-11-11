@@ -33,13 +33,13 @@ export function RulesClassic() {
     <div className="rules">
       <p className="lead">Like UNO, but with science. <b>First player to get rid of all their cards wins!</b></p>
       <ol className="steps">
-        <li><b>Everyone starts with 5 cards.</b></li>
+        <li><b>Everyone starts with 7 cards.</b></li>
         <li><b>Look at the middle pile.</b> The color under it is the active property: <b className="t-cohesion">blue = Cohesion</b>, <b className="t-adhesion">purple = Adhesion</b>, <b className="t-surface">gold = Surface Tension</b>.</li>
         <li><b>On your turn, play one card that matches that color.</b> Cards you're allowed to play <b>glow</b>. Tap one, then tap <b>Play</b>.</li>
         <li><b>Nothing glows?</b> Tap <b>Draw a card</b>. If the new card glows you can play it; otherwise tap <b>End turn</b>.</li>
         <li><b>Special cards:</b>
           <ul>
-            <li><b>Action</b> (red): skip the next player, reverse the order, make the next player draw 2, and more. An Action card can always go on top of another Action card.</li>
+            <li><b>Action</b> (red): skip the next player, reverse the order, make the next player draw 2, and more.</li>
             <li><b>Challenge</b> (orange): ask an opponent a science question. Wrong answer = they draw 2 cards.</li>
             <li><b>Real-World</b> (green) and <b>Power-Up</b> (pink) are <b>wild</b>: play them any time. Real-World cards ask you which property an example shows; a wrong answer means you draw 1.</li>
           </ul>

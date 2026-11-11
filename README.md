@@ -73,11 +73,11 @@ All configuration lives in Netlify's environment variables. The browser fetches 
 
 ## How to play
 
-Every card is linked to cohesion, adhesion or surface tension. There are **42 unique cards** (67 in the deck) in seven categories: Cohesion, Adhesion, Surface Tension, Challenge, Action, Real-World and Power-Up. The bank holds **40 science questions** plus 6 real-world classification cards, including combination questions such as *"Water rises in a narrow tube. Explain cohesion AND adhesion."* The full rules and a browsable card library with explanations are in the app under **How to Play**.
+Every card is linked to cohesion, adhesion or surface tension. There are **42 unique cards** (79 in the deck) in seven categories: Cohesion, Adhesion, Surface Tension, Challenge, Action, Real-World and Power-Up. The bank holds **40 science questions** plus 6 real-world classification cards, including combination questions such as *"Water rises in a narrow tube. Explain cohesion AND adhesion."* The full rules and a browsable card library with explanations are in the app under **How to Play**.
 
 ### Classic mode (UNO-style): first to empty their hand wins
-* Everyone starts with 5 cards. The color under the middle pile is the **active property** (blue = Cohesion, purple = Adhesion, gold = Surface Tension).
-* On your turn, play **one card that matches the color**. Playable cards glow. An Action card can always go on another Action card. Real-World and Power-Up cards are **wild**.
+* Everyone starts with 7 cards. The color under the middle pile is the **active property** (blue = Cohesion, purple = Adhesion, gold = Surface Tension).
+* On your turn, play **one card that matches the color**. Playable cards glow. Real-World and Power-Up cards are **wild**.
 * Nothing matches? **Draw a card**, then play it if it matches or end your turn.
 * **Action cards:** Soap Disruptor skips the next player, Evaporation reverses the order, Capillary Pull makes the next player draw 2, Surfactant Splash makes everyone else draw 1, and more.
 * **Science:** Challenge cards quiz an opponent (wrong answer = they draw 2). Real-World cards ask you to name the property an example shows (wrong = you draw 1). Science Star gives a bonus question (right = take another turn).

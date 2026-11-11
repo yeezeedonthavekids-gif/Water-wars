@@ -76,7 +76,7 @@ const prop = (
   points,
   power: points + 1,
   art,
-  copies: 2,
+  copies: 3,
 });
 
 export const CARDS: CardDef[] = [
@@ -215,7 +215,7 @@ export const CARDS: CardDef[] = [
     science: 'Soap molecules squeeze between water molecules at the surface and weaken surface tension.',
     classic: 'The next player is skipped.',
     battle: 'Pop a target\'s shield, then deal 2 damage.',
-    points: 1, power: 2, target: { battle: true }, art: 'soap', copies: 2,
+    points: 1, power: 2, target: { battle: true }, art: 'soap', copies: 1,
   },
   {
     id: 'act-evap', name: 'Evaporation', category: 'action', properties: ['cohesion'], effect: 'evaporation',
@@ -223,7 +223,7 @@ export const CARDS: CardDef[] = [
     science: 'To evaporate, a molecule must break the cohesive hydrogen bonds holding it to its neighbors. That takes energy.',
     classic: 'Reverse the turn order.',
     battle: 'Target discards a random card and takes 1 damage.',
-    points: 1, power: 1, target: { battle: true }, art: 'sun', copies: 2,
+    points: 1, power: 1, target: { battle: true }, art: 'sun', copies: 1,
   },
   {
     id: 'act-swap', name: 'Property Swap', category: 'action', properties: ['adhesion'], effect: 'swap',
@@ -231,7 +231,7 @@ export const CARDS: CardDef[] = [
     science: 'Adhesion means water can stick to many different materials, so it can switch from one surface to another.',
     classic: 'Give one of your cards to an opponent and take a random card from them.',
     battle: 'Give one of your cards to an opponent and take a random card from them.',
-    points: 1, power: 0, target: { classic: true, battle: true }, art: 'swap', copies: 2,
+    points: 1, power: 0, target: { classic: true, battle: true }, art: 'swap', copies: 1,
   },
   {
     id: 'act-capillary', name: 'Capillary Pull', category: 'action', properties: ['adhesion'], effect: 'capillary',
@@ -239,7 +239,7 @@ export const CARDS: CardDef[] = [
     science: 'In narrow spaces, adhesion pulls water up the walls and cohesion drags more water along behind it.',
     classic: 'The next player draws 2 cards.',
     battle: 'You draw 2 cards.',
-    points: 1, power: 0, art: 'tube', copies: 2,
+    points: 1, power: 0, art: 'tube', copies: 1,
   },
   {
     id: 'act-grab', name: 'Droplet Grab', category: 'action', properties: ['cohesion'], effect: 'grab',
@@ -247,7 +247,7 @@ export const CARDS: CardDef[] = [
     science: 'When drops touch, cohesion pulls them together, so a little drop gets absorbed into the big drop next to it.',
     classic: 'Push one of your cards into an opponent\'s hand.',
     battle: 'Take a random card from an opponent.',
-    points: 1, power: 0, target: { classic: true, battle: true }, art: 'grab', copies: 2,
+    points: 1, power: 0, target: { classic: true, battle: true }, art: 'grab', copies: 1,
   },
   {
     id: 'act-splash', name: 'Surfactant Splash', category: 'action', properties: ['surface'], effect: 'splash',
@@ -255,7 +255,7 @@ export const CARDS: CardDef[] = [
     science: 'Surfactants (like detergents) lower surface tension everywhere they spread, so floating objects sink.',
     classic: 'Every other player draws 1 card.',
     battle: 'Deal 2 damage to every opponent.',
-    points: 1, power: 2, art: 'splash', copies: 2,
+    points: 1, power: 2, art: 'splash', copies: 1,
   },
 
   // ───────── Real-World Examples ─────────
@@ -357,7 +357,5 @@ export function classicPlayable(c: CardDef, active: Property | null, topId: stri
   if (!active) return true;
   if (c.properties.includes(active)) return true;
   if (topId && defOf(topId).id === c.id) return true;
-  // Like UNO's matching symbols: an Action card can always follow another Action card.
-  if (topId && c.category === 'action' && defOf(topId).category === 'action') return true;
   return false;
 }
