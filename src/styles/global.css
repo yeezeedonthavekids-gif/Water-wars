@@ -581,7 +581,7 @@ button.card:hover { transform: translateY(-4px) rotate(-1deg); }
 
 /* ───────── Responsive ───────── */
 @media (max-width: 420px) {
-  .gt-code, .gt-code + .gt-sep, .game-title .gt-sep:nth-of-type(2) { display: none; }
+  .gt-code, .gt-sep-code { display: none; }
   .game-top .icon-btn { width: 38px; height: 38px; }
 }
 @media (max-width: 560px) {

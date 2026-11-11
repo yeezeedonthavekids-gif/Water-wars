@@ -254,7 +254,7 @@ export function GameScreen({ room, view, onLeave }: { room: RoomState; view: Pub
           <span className="gt-mode">{battle ? 'Battle' : 'Classic'}</span>
           <span className="gt-sep">·</span>
           <span>Round {view.round}/{view.maxRounds}</span>
-          <span className="gt-sep">·</span>
+          <span className="gt-sep gt-sep-code">·</span>
           <span className="gt-code">{view.code}</span>
         </div>
         <button className="icon-btn" onClick={() => setDialog({ kind: 'rules' })} aria-label="Rules">
